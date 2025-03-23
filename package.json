@@ -1,0 +1,53 @@
+{
+    "name": "@pkg-ru/imager-client",
+    "version": "1.0.0",
+    "description": "Генерация ссылок на миниатюры картинки в микро-сервисе Imager",
+    "homepage": "https://github.com/pkg-ru/imager",
+    "readme": "README.md",
+    "support": {
+        "source": "https://github.com/pkg-ru/imager-client",
+        "docs": "https://github.com/pkg-ru/imager-client/README.md"
+    },
+    "keywords": [
+        "assets",
+        "imager",
+        "image",
+        "webp",
+        "avif",
+        "heif",
+        "heic",
+        "jpg",
+        "png",
+        "gif"
+    ],
+    "main": "dist/Imager.js",
+    "module": "dist/Imager.mjs",
+    "types": "dist/Imager.d.ts",
+    "license": "GPL-3.0",
+    "scripts": {
+        "build": "npm run build:mjs && npm run build:js",
+        "build:js": "npm run build:js:write && npm run build:js:compress && npm run build:js:compress:mjs",
+        "build:js:write": "rollup -c rollup.config.js",
+        "build:js:compress": "uglifyjs dist/Imager.js --compress --mangle --output dist/Imager.min.js",
+        "build:js:compress:mjs": "uglifyjs dist/Imager.mjs --compress --mangle --output dist/Imager.min.mjs",
+        "build:mjs": "tsc --module ES6 && mv dist/Imager.js dist/Imager.mjs",
+        "lint": "eslint src/imager-ts/Imager.ts",
+        "test": "go run test/*.go"
+    },
+    "devDependencies": {
+        "@types/node": "^22.13.11",
+        "@typescript-eslint/eslint-plugin": "^8.27",
+        "@typescript-eslint/parser": "^8.27",
+        "eslint": "^8.7",
+        "prettier": "^3.5",
+        "rollup": "^4.36.0",
+        "rollup-plugin-typescript2": "^0.36",
+        "typescript": "^5.8",
+        "uglify-js": "^3.19"
+    },
+    "files": [
+        "src/imager-ts",
+        "dist",
+        "test"
+    ]
+}

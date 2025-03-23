@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+authors = [
+  {name = "Altuhov Vladislav"},
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GPL-3.0",
+  "Operating System :: OS Independent",
+]
+description = "Генерация ссылок на миниатюры картинки в микро-сервисе Imager"
+keywords = ["assets", "imager", "image", "webp", "avif", "heif", "heic", "jpg", "png", "gif"]
+name = "imager_client"
+readme = "README.md"
+requires-python = ">=3.10.0"
+version = "1.0.0"
+
+[project.scripts]
+imager_client = "imager_client.scr.imager:cli"
+
+
+[project.urls]
+Homepage = "https://github.com/pkg-ru/imager"
+Repository = "https://github.com/pkg-ru/imager-client"

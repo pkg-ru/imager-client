@@ -1,0 +1,17 @@
+services:
+  imager-client:
+    container_name: imager-client
+    build:
+      context: .
+    volumes:
+      - ./:/app:rw
+    working_dir: /app
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.171.111.0/24

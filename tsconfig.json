@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "module": "ES2015",
+        "lib": [
+            "es2016",
+            "dom"
+        ],
+        "esModuleInterop": true,
+        "target": "es2016",
+        "newLine": "LF",
+        "declaration": true,
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "strictNullChecks": true,
+        "outDir": "dist"
+    },
+    "include": [
+        "src/imager-ts/**/*"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}

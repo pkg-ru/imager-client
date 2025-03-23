@@ -1,0 +1,11 @@
+{
+    "type": "CommonJS",
+    "compilerOptions": {
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "module": "CommonJS",
+        "baseUrl": "../"
+    },
+    "exclude": ["node_modules"],
+    "include": ["src/imager-ts/**/*.ts"]
+}
