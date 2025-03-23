@@ -8,7 +8,7 @@ authors = [
 ]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: GPL-3.0",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
   "Operating System :: OS Independent",
 ]
 description = "Генерация ссылок на миниатюры картинки в микро-сервисе Imager"
@@ -17,6 +17,7 @@ name = "imager_client"
 readme = "README.md"
 requires-python = ">=3.10.0"
 version = "1.0.0"
+license = {file = "LICENSE"}
 
 [project.scripts]
 imager_client = "imager_client.scr.imager:cli"
