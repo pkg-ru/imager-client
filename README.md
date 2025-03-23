@@ -1,4 +1,4 @@
-# Imager Client
+# [Imager](https://github.com/pkg-ru/imager) Client
 
 Компонент для генерации ссылок на миниатюры картинок в микро-сервисе **Imager**.
 
