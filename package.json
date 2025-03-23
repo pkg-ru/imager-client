@@ -1,5 +1,5 @@
 {
-    "name": "@pkg-ru/imager-client",
+    "name": "imager-client",
     "version": "1.0.0",
     "description": "Генерация ссылок на миниатюры картинки в микро-сервисе Imager",
     "homepage": "https://github.com/pkg-ru/imager",

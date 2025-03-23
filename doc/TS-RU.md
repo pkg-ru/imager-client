@@ -3,7 +3,7 @@
 **RU** / [EN](./TS-EN.md) / [Общие сведения](../README.md)
 
 ```bash
-npm i @pkg-ru/imager-client
+npm i imager-client
 ```
 
 ### Пример
