@@ -191,7 +191,8 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 >
 > Example:
 >
-> ```json
+> ```js
+> {
 > # width
 > 'width': 100,
 > # height
@@ -210,6 +211,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 > 'trimRate': 20,
 > # list of colors for edge trimming
 > 'trimColor': [[255, 255, 255], [0, 0, 0]],
+> }
 > ```
 
 </details>
