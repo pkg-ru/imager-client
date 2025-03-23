@@ -1,32 +1,8 @@
 # [Imager](https://github.com/pkg-ru/imager) Client
 
-Компонент для генерации ссылок на миниатюры картинок в микро-сервисе **Imager**.
+Компонент для генерации ссылок на сжатые миниатюры картинок в микро-сервисе **Imager**.
 
 > Для работы нужно настроить и запустить [микро-сервис Imager](https://github.com/pkg-ru/imager).
-
-## Клонирование репозитория
-
-```bash
-git clone https://github.com/pkg-ru/imager-client.git && cd imager-client
-```
-
-## Установка контейнера разработки
-
-```bash
-docker compose build && docker compose start
-```
-
-## Запуск тестов
-
-```bash
-docker exec -it imager-client bash -c "go run test/*.go"
-```
-
-## Сборка
-
-```bash
-docker exec -it imager-client bash -c "go run test/*.go && npm run build && python3 -m build"
-```
 
 ## Документация: **RU** / [EN](./doc/README-EN.md)
 
@@ -41,7 +17,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Инициализация компонента
 
-`Imager` (_thumb_)</summary>
+**Imager**(_thumb_)</summary>
 
 > ##### _thumb_ - название настроек на сервере (по умолчанию: `default`)
 >
@@ -51,7 +27,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Настройки обработки картинок на сервере
 
-`thumb` (_thumb_)</summary>
+**thumb**(_thumb_)</summary>
 
 > ##### _thumb_ - название настроек на сервере (по умолчанию: `default`)
 
@@ -59,7 +35,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Ширина картинки
 
-`width` (_width_)</summary>
+**width**(_width_)</summary>
 
 > ##### _width_ - ширина.
 >
@@ -69,7 +45,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Высота картинки
 
-`height` (_height_)</summary>
+**height**(_height_)</summary>
 
 > ##### _height_ - высота.
 >
@@ -79,7 +55,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Установка ширины и высоты изображения
 
-`size` (_width_, _height_)</summary>
+**size**(_width_, _height_)</summary>
 
 > ##### _width_ - ширина.
 >
@@ -93,7 +69,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Обрезка изображения в размер
 
-`crop` (_crop_)</summary>
+**crop**(_crop_)</summary>
 
 > ##### _crop_ - обрезка изображения (по умолчанию `false`).
 >
@@ -105,7 +81,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Повтор анимации
 
-`loop` (_loop_)</summary>
+**loop**(_loop_)</summary>
 
 > ##### _loop_ - повтор анимации (по умолчанию `true`).
 >
@@ -116,7 +92,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Заливка фона цветом
 
-`color` (_r_, _g_, _b_)</summary>
+**color**(_r_, _g_, _b_)</summary>
 
 > ##### _r_ - Красный.
 >
@@ -130,7 +106,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Обрезание краев картинки
 
-`trim` (_active_, _rate_, _colors_)</summary>
+**trim**(_active_, _rate_, _colors_)</summary>
 
 > ##### _active_ - активность фильтра.
 >
@@ -144,7 +120,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Активность обрезания краев картинки
 
-`trimActive` (_active_)</summary>
+**trimActive**(_active_)</summary>
 
 > ##### _active_ - активность фильтра обрезания краев.
 >
@@ -155,7 +131,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Степень сопоставления цвета для обрезания краев
 
-`trimRate` (_rate_)</summary>
+**trimRate**(_rate_)</summary>
 
 > ##### _rate_ - степень сопоставления цвета.
 >
@@ -165,7 +141,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Цвета, которые будут обрезаны по краям
 
-`trimColors` (_colors_)</summary>
+**trimColors**(_colors_)</summary>
 
 > ##### _colors_ - список цветов.
 >
@@ -175,7 +151,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Качество превью картинки
 
-`quality` (_quality_)</summary>
+**quality**(_quality_)</summary>
 
 > ##### _quality_ - качество результата.
 >
@@ -185,7 +161,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Настройка (кроме Go)
 
-`setting` (_setting_)</summary>
+**setting**(_setting_)</summary>
 
 > ##### _setting_ - список/массив настроек (кроме Go).
 >
@@ -218,7 +194,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Копирование, чтобы не вносить изменения в общий экземпляр
 
-`copy` () / `clone` ()</summary>
+**copy**() / **clone**()</summary>
 
 > Можно использовать для группировки по типам/настройкам ассетов.
 
@@ -226,7 +202,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Получение ссылки без изменения формата картинки
 
-`get` (_file_, _setting_)</summary>
+**get**(_file_, _setting_)</summary>
 
 > ##### _file_ - путь к исходному файлу (относительно web).
 >
@@ -238,7 +214,7 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 
 <details><summary>Получение ссылки с конвертацией в другой формат
 
-`convert` (_file_, _format_, _setting_)</summary>
+**convert**(_file_, _format_, _setting_)</summary>
 
 > ##### _file_ - путь к исходному файлу (относительно web).
 >
@@ -249,3 +225,30 @@ docker exec -it imager-client bash -c "go run test/*.go && npm run build && pyth
 > Генерирует ссылку на ассет картинки по установленным параметрам и с установленным расширением файла результата.
 
 </details>
+
+---
+
+## Клонирование репозитория
+
+```bash
+git clone https://github.com/pkg-ru/imager-client.git && cd imager-client
+```
+
+## Установка контейнера разработки
+
+```bash
+docker compose build && docker compose start
+```
+
+## Запуск тестов
+
+```bash
+docker exec -it imager-client bash -c "go run test/*.go"
+```
+
+## Сборка
+
+```bash
+docker exec -it imager-client bash -c "go run test/*.go && npm run build && python3 -m build"
+```
+
