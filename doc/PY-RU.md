@@ -3,13 +3,13 @@
 **RU** / [EN](./PY-EN.md) / [Общие сведения](../README.md)
 
 ```bash
-pip install imager_client
+pip install imager-client
 ```
 
 ### Пример
 
 ```py
-from imager_client import Imager
+from imager import Imager
 
 # в img - общие настройки
 img = Imager()
