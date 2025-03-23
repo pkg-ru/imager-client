@@ -13,7 +13,7 @@ package main
 
 import (
 	"fmt"
-	imager "github.com/pkg-ru/imager-client"
+	"github.com/pkg-ru/imager-client"
 )
 
 func main() {
