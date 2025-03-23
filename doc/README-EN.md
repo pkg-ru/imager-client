@@ -4,7 +4,7 @@ A component for generating links to compressed image thumbnails in the **Imager*
 
 > To use it, you need to set up and run the [Imager microservice](https://github.com/pkg-ru/imager).
 
-## Documentation: [RU](../README-RU.md) / **EN**
+## Documentation: [RU](../README.md) / **EN**
 
 - [Golang](./GO-EN.md)
 - [PHP](./PHP-EN.md)
