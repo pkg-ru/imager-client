@@ -19,7 +19,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -35,18 +34,13 @@ func ToInt(v any) int {
 	if v == nil {
 		return 0
 	}
-	t := reflect.TypeOf(v)
-	if t == reflect.TypeFor[int]() {
-		n, _ := reflect.TypeAssert[int](reflect.ValueOf(v))
-		return n
-	}
-	if t == reflect.TypeFor[float64]() {
-		f, _ := reflect.TypeAssert[float64](reflect.ValueOf(v))
-		return int(f)
-	}
-	if t == reflect.TypeFor[string]() {
-		s, _ := reflect.TypeAssert[string](reflect.ValueOf(v))
-		s = strings.TrimSpace(s)
+	switch t := v.(type) {
+	case int:
+		return t
+	case float64:
+		return int(t)
+	case string:
+		s := strings.TrimSpace(t)
 		if s != "" {
 			n, err := strconv.Atoi(s)
 			if err == nil {
@@ -54,8 +48,9 @@ func ToInt(v any) int {
 			}
 		}
 		return 0
+	default:
+		return 0
 	}
-	return 0
 }
 
 // JSON-значение → string (для format/dprs).
@@ -63,20 +58,16 @@ func ToString(v any) string {
 	if v == nil {
 		return ""
 	}
-	t := reflect.TypeOf(v)
-	if t == reflect.TypeFor[string]() {
-		s, _ := reflect.TypeAssert[string](reflect.ValueOf(v))
-		return s
+	switch t := v.(type) {
+	case string:
+		return t
+	case float64:
+		return strconv.Itoa(int(t))
+	case int:
+		return strconv.Itoa(t)
+	default:
+		return ""
 	}
-	if t == reflect.TypeFor[float64]() {
-		f, _ := reflect.TypeAssert[float64](reflect.ValueOf(v))
-		return strconv.Itoa(int(f))
-	}
-	if t == reflect.TypeFor[int]() {
-		n, _ := reflect.TypeAssert[int](reflect.ValueOf(v))
-		return strconv.Itoa(n)
-	}
-	return ""
 }
 
 // JSON-объект {width,height} → Size (поля необязательны).
@@ -85,7 +76,7 @@ func ToSize(v any) imagergo.Size {
 	if v == nil {
 		return sz
 	}
-	m, _ := reflect.TypeAssert[map[string]any](reflect.ValueOf(v))
+	m := v.(map[string]any)
 	if m["width"] != nil {
 		sz.Width = ToInt(m["width"])
 	}
@@ -100,22 +91,20 @@ func ToSegment(v any) any {
 	if v == nil {
 		return nil
 	}
-	t := reflect.TypeOf(v)
-	if t == reflect.TypeFor[string]() {
-		return v
-	}
-	if t == reflect.TypeFor[map[string]any]() {
-		return ToSize(v)
-	}
-	if t == reflect.TypeFor[[]any]() {
-		arr, _ := reflect.TypeAssert[[]any](reflect.ValueOf(v))
+	switch t := v.(type) {
+	case string:
+		return t
+	case map[string]any:
+		return ToSize(t)
+	case []any:
 		nums := []int{}
-		for _, e := range arr {
+		for _, e := range t {
 			nums = append(nums, ToInt(e))
 		}
 		return nums
+	default:
+		return v
 	}
-	return v
 }
 
 // JSON-список сегментов → []any (каждый через ToSegment).
@@ -125,16 +114,16 @@ func ToSegments(v any) []any {
 	if v == nil {
 		return nil
 	}
-	t := reflect.TypeOf(v)
-	if t == reflect.TypeFor[[]any]() {
-		arr, _ := reflect.TypeAssert[[]any](reflect.ValueOf(v))
-		for _, e := range arr {
+	switch t := v.(type) {
+	case []any:
+		for _, e := range t {
 			result = append(result, ToSegment(e))
 		}
 		return result
+	default:
+		result = append(result, ToSegment(v))
+		return result
 	}
-	result = append(result, ToSegment(v))
-	return result
 }
 
 // JSON-формат(ы) → []string.
@@ -143,25 +132,23 @@ func ToFormats(v any) []string {
 	if v == nil {
 		return result
 	}
-	t := reflect.TypeOf(v)
-	if t == reflect.TypeFor[string]() {
-		s, _ := reflect.TypeAssert[string](reflect.ValueOf(v))
-		if s != "" {
-			result = append(result, s)
+	switch t := v.(type) {
+	case string:
+		if t != "" {
+			result = append(result, t)
 		}
 		return result
-	}
-	if t == reflect.TypeFor[[]any]() {
-		arr, _ := reflect.TypeAssert[[]any](reflect.ValueOf(v))
-		for _, e := range arr {
+	case []any:
+		for _, e := range t {
 			s := ToString(e)
 			if s != "" {
 				result = append(result, s)
 			}
 		}
 		return result
+	default:
+		return result
 	}
-	return result
 }
 
 // ------------------------------------------------------------------ //
@@ -197,7 +184,7 @@ func BuildOptions(raw any) imagergo.Options {
 	if raw == nil {
 		return o
 	}
-	m, _ := reflect.TypeAssert[map[string]any](reflect.ValueOf(raw))
+	m := raw.(map[string]any)
 
 	if m["token"] != nil {
 		o.Token = ToString(m["token"])
@@ -222,15 +209,15 @@ func BuildOptions(raw any) imagergo.Options {
 
 // Вызывает метод Imager по кейсу и возвращает результат (any).
 func RunCase(c any) any {
-	m, _ := reflect.TypeAssert[map[string]any](reflect.ValueOf(c))
-	method, _ := reflect.TypeAssert[string](reflect.ValueOf(m["method"]))
+	m := c.(map[string]any)
+	method := m["method"].(string)
 	args := m["args"]
-	am, _ := reflect.TypeAssert[map[string]any](reflect.ValueOf(args))
+	am := args.(map[string]any)
 
 	img := imagergo.New(BuildOptions(m["options"]))
 
 	if method == "GetAsset" {
-		source, _ := reflect.TypeAssert[string](reflect.ValueOf(am["source"]))
+		source := am["source"].(string)
 		format := ""
 		if am["format"] != nil {
 			format = ToString(am["format"])
@@ -238,7 +225,7 @@ func RunCase(c any) any {
 		return img.GetAsset(source, ToSegment(am["segment"]), format, am["dpr"])
 	}
 	if method == "GetAssets" {
-		source, _ := reflect.TypeAssert[string](reflect.ValueOf(am["source"]))
+		source := am["source"].(string)
 		var segs any
 		if am["segments"] == nil {
 			segs = nil
@@ -254,7 +241,7 @@ func RunCase(c any) any {
 		return img.GetAssets(source, segs, formats, am["dprs"])
 	}
 	if method == "GetAssetPath" {
-		source, _ := reflect.TypeAssert[string](reflect.ValueOf(am["source"]))
+		source := am["source"].(string)
 		format := ""
 		if am["format"] != nil {
 			format = ToString(am["format"])
@@ -262,7 +249,7 @@ func RunCase(c any) any {
 		return img.GetAssetPath(source, ToSegment(am["segment"]), format, am["dpr"])
 	}
 	if method == "GetAssetsHtml" {
-		source, _ := reflect.TypeAssert[string](reflect.ValueOf(am["source"]))
+		source := am["source"].(string)
 		var segs any
 		if am["segments"] == nil {
 			segs = nil
@@ -277,7 +264,7 @@ func RunCase(c any) any {
 		}
 		var opts map[string]any
 		if am["options"] != nil {
-			opts, _ = reflect.TypeAssert[map[string]any](reflect.ValueOf(am["options"]))
+			opts = am["options"].(map[string]any)
 		}
 		return img.GetAssetsHtml(source, segs, formats, am["dprs"], opts)
 	}
@@ -317,8 +304,7 @@ func Canonical(expected any, method string) string {
 		return Dumps(list)
 	}
 	// GetAssetPath — строка
-	s, _ := reflect.TypeAssert[string](reflect.ValueOf(expected))
-	return s
+	return expected.(string)
 }
 
 func RunGolden() int {
@@ -327,17 +313,17 @@ func RunGolden() int {
 	total := 0
 	for _, c := range cases {
 		total++
-		m, _ := reflect.TypeAssert[map[string]any](reflect.ValueOf(c))
+		m := c.(map[string]any)
 		cid := ToInt(m["id"])
-		method, _ := reflect.TypeAssert[string](reflect.ValueOf(m["method"]))
+		method := m["method"].(string)
 
 		actual := RunCase(c)
 		expected := m["expected"]
 		var actualStr, expectedStr string
 		if method == "GetAssetPath" || method == "GetAssetsHtml" {
 			// строки сравниваем напрямую (без JSON-кавычек)
-			actualStr, _ = reflect.TypeAssert[string](reflect.ValueOf(actual))
-			expectedStr, _ = reflect.TypeAssert[string](reflect.ValueOf(expected))
+			actualStr = actual.(string)
+			expectedStr = expected.(string)
 		} else {
 			actualStr = Dumps(actual)
 			expectedStr = Canonical(expected, method)
@@ -592,27 +578,27 @@ func ParseJsonObject(s string) map[string]string {
 	if err != nil {
 		return result
 	}
-	m, _ := reflect.TypeAssert[map[string]any](reflect.ValueOf(v))
+	m := v.(map[string]any)
 	for k, val := range m {
 		if val == nil {
 			result[k] = ""
-		} else if reflect.TypeOf(val) == reflect.TypeFor[string]() {
-			str, _ := reflect.TypeAssert[string](reflect.ValueOf(val))
-			result[k] = str
-		} else if reflect.TypeOf(val) == reflect.TypeFor[bool]() {
-			b, _ := reflect.TypeAssert[bool](reflect.ValueOf(val))
-			if b {
-				result[k] = "true"
-			} else {
-				result[k] = "false"
-			}
-		} else if reflect.TypeOf(val) == reflect.TypeFor[[]string]() {
-			arr, _ := reflect.TypeAssert[[]string](reflect.ValueOf(val))
-			data, _ := json.Marshal(arr)
-			result[k] = bytes.NewBuffer(data).String()
 		} else {
-			data, _ := json.Marshal(val)
-			result[k] = bytes.NewBuffer(data).String()
+			switch t := val.(type) {
+			case string:
+				result[k] = t
+			case bool:
+				if t {
+					result[k] = "true"
+				} else {
+					result[k] = "false"
+				}
+			case []string:
+				data, _ := json.Marshal(t)
+				result[k] = bytes.NewBuffer(data).String()
+			default:
+				data, _ := json.Marshal(val)
+				result[k] = bytes.NewBuffer(data).String()
+			}
 		}
 	}
 	return result
