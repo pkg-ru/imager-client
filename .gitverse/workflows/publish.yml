@@ -25,9 +25,12 @@ on:
 jobs:
   build-test:
     name: Build, Test & Dispatch
-    # Защита от повторного запуска при force-push тега (после коммита манифестов):
-    # github.event.created == false при перемещении существующего тега。
-    if: github.event.created != false
+    # ВАЖНО: без условия github.event.created — в GitVerse это поле
+    # не работает как в GitHub (для annotated tag created не становится true),
+    # из-за чего job пропускался. Повторный запуск после force-push тега
+    # безопасен: sync_version.py не найдёт изменений (synced=false),
+    # а повторный dispatch приведёт к ошибке "version already exists"
+    # в npm/PyPI, что не ломает ничего.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
