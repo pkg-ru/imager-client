@@ -26,7 +26,10 @@ jobs:
           fetch-all: true
 
       # Синхронизируем только ветки и теги (без refs/remotes и прочего мусора):
-      # +refs/heads/* — force-push всех веток, +refs/tags/* — force-push всех тегов,
+      # +refs/remotes/origin/* — force-push всех веток из remote-tracking refs
+      #   (actions/checkout создаёт именно их, а не локальные refs/heads/*;
+      #   иначе --prune пытается удалить default branch в GitHub);
+      # +refs/tags/* — force-push всех тегов,
       # --prune удаляет в GitHub ветки/теги, которых больше нет в GitVerse.
       # Force-push тега из publish.yml (после sync_version) тоже попадёт сюда —
       # это безопасно, т.к. GitHub-воркфлоу публикует только по repository_dispatch.
@@ -35,4 +38,4 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git remote add mirror "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-client.git"
-          git push --prune mirror "+refs/heads/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
+          git push --prune mirror "+refs/remotes/origin/*:refs/heads/*" "+refs/tags/*:refs/tags/*"
