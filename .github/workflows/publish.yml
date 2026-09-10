@@ -1,0 +1,110 @@
+name: Publish (npm + PyPI)
+
+# Публикация запускается двумя путями:
+
+#  1. repository_dispatch из GitVerse (основной репозиторий) после успешных тестов;
+#  2. прямой push тега v* в GitHub (резервный путь)。
+# npm и PyPI поддерживают OIDC-публикацию только через GitHub Actions,
+# поэтому обе публикации живут здесь, без долгоживущих токенов。
+
+# Версия в манифестах уже проставлена в .gitverse (sync_version.py коммитит
+# манифесты в тег перед отправкой dispatch), поэтому здесь sync_version не нужен。
+
+# Все публикации выполняются в одном контейнере (одна джоба publish)。
+
+
+on:
+  push:
+    tags:
+      - 'v*'
+  repository_dispatch:
+    types: [publish]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish (npm + PyPI)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC для npm provenance и PyPI Trusted Publisher
+      contents: read
+    steps:
+      # Определяем имя тега: при repository_dispatch тег приходит в payload,
+      # при push тега — из ref。
+      - name: Resolve tag name
+        id: tag
+        env:
+          PAYLOAD_TAG: ${{ github.event.client_payload.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ -n "$PAYLOAD_TAG" ]; then
+            TAG="$PAYLOAD_TAG"
+          else
+            TAG="$REF_NAME"
+          fi
+          case "$TAG" in
+            v*) ;;
+            *) echo "Некорректный тег: $TAG" >&2; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Публикация по тегу: $TAG"
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Setup Node.js 24 (npm provenance requires Node >=  ​24)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build core (imager-client)
+        run: npm run build
+
+      - name: Publish core to npm (OIDC provenance, no token)
+        run: npm publish --provenance --access public
+
+      - name: Publish @pkg-ru/imager-react to npm
+        run: |
+          cd packages/react
+          npm ci
+          npm run build
+          npm publish --provenance --access public
+
+      - name: Publish @pkg-ru/imager-vue to npm
+        run: |
+          cd packages/vue
+          npm ci
+          npm run build
+          npm publish --provenance --access public
+
+      - name: Install build tools (PyPI)
+        run: python -m pip install --upgrade build twine
+
+      # Документация должна попасть в sdist и wheel: копируем doc/*.md
+      # внутрь пакета imager (подключено как package-data в pyproject.toml)
+      - name: Copy docs into package
+        run: |
+          mkdir -p src/imager/doc
+          cp doc/*.md src/imager/doc/
+
+      - name: Build distribution
+        run: python -m build
+
+      - name: Check distribution
+        run: python -m twine check dist/*
+
+      - name: Publish to PyPI (OIDC Trusted Publisher, no token)
+        uses: pypa/gh-action-pypi-publish@release/v1

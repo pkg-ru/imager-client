@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "imager_client"
+version = "1.0.0"
+description = "Клиент микросервиса Imager: построение путей/URL ассетов и админ-методы"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Altuhov Vladislav", email = "33ugla@mail.ru"},
+]
+keywords = ["imager", "assets", "image", "webp", "avif", "heif", "heic", "jpg", "png", "gif"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://gitverse.ru/pkg-ru/imager"
+Repository = "https://gitverse.ru/pkg-ru/imager-client"
+Mirror = "https://github.com/pkg-ru/imager-client"
+
+[tool.setuptools]
+packages = ["imager"]
+
+[tool.setuptools.package-dir]
+imager = "src/imager"
+
+# Документация копируется в src/imager/doc/ на этапе сборки (шаг в CI),
+# чтобы попасть в wheel как package-data.
+[tool.setuptools.package-data]
+imager = ["doc/*.md"]

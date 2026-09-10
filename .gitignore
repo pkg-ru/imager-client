@@ -1,0 +1,15 @@
+vendor/
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+dist/*
+test/dist/
+build/
+*.egg-info/
+# Артефакты компиляции tsc (исходники — только .ts)
+src/imager-ts/*.js
+src/imager-ts-server/*.js
+packages/*/test/*.js
+packages/*/dist-test/
+packages/*/dist/

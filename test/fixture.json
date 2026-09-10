@@ -1,0 +1,1189 @@
+[
+    {
+        "id": 1,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "format": "webp",
+            "dpr": 2
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "/test.gif",
+            "segment": {
+                "width": 200,
+                "height": 200
+            },
+            "format": "gif",
+            "dpr": 2
+        },
+        "expected": {
+            "type": "image/gif",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/test-gif/200x200@2.gif",
+                    "dpr": 2,
+                    "width": 400,
+                    "height": 400
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 2,
+        "options": {
+            "baseURL": "/"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "thumbs/photo.jpg",
+            "segment": "thumb",
+            "format": "webp"
+        },
+        "expected": "/thumbs/photo-jpg/thumb.webp"
+    },
+    {
+        "id": 3,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "formats": [
+                "webp",
+                "avif"
+            ],
+            "dpr": 3
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "test.png",
+            "segments": [
+                "200x200",
+                {
+                    "width": 400
+                }
+            ],
+            "formats": null
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200.webp",
+                        "width": 200,
+                        "height": 200
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200@2.webp",
+                        "dpr": 2,
+                        "width": 400,
+                        "height": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200@3.webp",
+                        "dpr": 3,
+                        "width": 600,
+                        "height": 600
+                    }
+                ]
+            },
+            {
+                "type": "image/avif",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200.avif",
+                        "width": 200,
+                        "height": 200
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200@2.avif",
+                        "dpr": 2,
+                        "width": 400,
+                        "height": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200@3.avif",
+                        "dpr": 3,
+                        "width": 600,
+                        "height": 600
+                    }
+                ]
+            },
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x.webp",
+                        "width": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x@2.webp",
+                        "dpr": 2,
+                        "width": 800
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x@3.webp",
+                        "dpr": 3,
+                        "width": 1200
+                    }
+                ]
+            },
+            {
+                "type": "image/avif",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x.avif",
+                        "width": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x@2.avif",
+                        "dpr": 2,
+                        "width": 800
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x@3.avif",
+                        "dpr": 3,
+                        "width": 1200
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": 4,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "thumb"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/thumb.jpg"
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 5,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200.jpg",
+                    "width": 200,
+                    "height": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 6,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x.jpg",
+                    "width": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 7,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "x200"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/x200.jpg",
+                    "height": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 8,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "x"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/x.jpg"
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 9,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": {
+                "width": 200,
+                "height": 200
+            }
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200.jpg",
+                    "width": 200,
+                    "height": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 10,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": {
+                "height": 400
+            }
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/x400.jpg",
+                    "height": 400
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 11,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": {
+                "width": 300
+            }
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/300x.jpg",
+                    "width": 300
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 12,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": {}
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/x.jpg"
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 13,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": [
+                200,
+                300
+            ]
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x300.jpg",
+                    "width": 200,
+                    "height": 300
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 14,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/x.jpg"
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 15,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "dpr": 0
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200.jpg",
+                    "width": 200,
+                    "height": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 16,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200",
+            "dpr": 0
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200.jpg",
+                    "width": 200,
+                    "height": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 17,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200",
+            "dpr": 1
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200.jpg",
+                    "dpr": 1,
+                    "width": 200,
+                    "height": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 18,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200",
+            "dpr": 2
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200@2.jpg",
+                    "dpr": 2,
+                    "width": 400,
+                    "height": 400
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 19,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200",
+            "dpr": 3
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200@3.jpg",
+                    "dpr": 3,
+                    "width": 600,
+                    "height": 600
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 20,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200",
+            "dpr": "2"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200@2.jpg",
+                    "dpr": 2,
+                    "width": 400,
+                    "height": 400
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 21,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "dpr": 2
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200@2.jpg",
+                    "dpr": 2,
+                    "width": 400,
+                    "height": 400
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 22,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "thumb",
+            "dpr": 4
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/thumb@3.jpg",
+                    "dpr": 3
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 23,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "format": "webp"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "x"
+        },
+        "expected": {
+            "type": "image/webp",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/x.webp"
+                }
+            ]
+        }
+    },
+    {
+        "id": 24,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "format": "gif"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "thumb",
+            "format": "avif"
+        },
+        "expected": {
+            "type": "image/avif",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/thumb.avif"
+                }
+            ]
+        }
+    },
+    {
+        "id": 25,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.png",
+            "segment": "thumb"
+        },
+        "expected": {
+            "type": "image/png",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-png/thumb.png"
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 26,
+        "options": {
+            "baseURL": "https://imgs.example.com/images"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "test.gif",
+            "segment": "200x200",
+            "format": "webp"
+        },
+        "expected": "https://imgs.example.com/images/test-gif/200x200.webp"
+    },
+    {
+        "id": 27,
+        "options": {
+            "baseURL": "/images/"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "thumbs/photo.jpg",
+            "segment": "thumb",
+            "format": "webp"
+        },
+        "expected": "/images/thumbs/photo-jpg/thumb.webp"
+    },
+    {
+        "id": 28,
+        "options": {
+            "baseURL": ""
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "test.gif",
+            "segment": "200x200",
+            "format": "webp"
+        },
+        "expected": "/test-gif/200x200.webp"
+    },
+    {
+        "id": 29,
+        "options": {
+            "baseURL": "/images"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "test.gif",
+            "segment": "200x200",
+            "format": "webp"
+        },
+        "expected": "/images/test-gif/200x200.webp"
+    },
+    {
+        "id": 30,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "test.png"
+        },
+        "expected": [
+            {
+                "type": "image/png",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x.png"
+                    }
+                ],
+                "source_format": true,
+                "all_support": true
+            }
+        ]
+    },
+    {
+        "id": 31,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "test.png",
+            "segments": [
+                "200x200",
+                "x400"
+            ],
+            "formats": "webp"
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200.webp",
+                        "width": 200,
+                        "height": 200
+                    }
+                ]
+            },
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x400.webp",
+                        "height": 400
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": 32,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "test.png",
+            "formats": [
+                "webp",
+                "gif"
+            ],
+            "dprs": 2
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x.webp"
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x@2.webp",
+                        "dpr": 2
+                    }
+                ]
+            },
+            {
+                "type": "image/gif",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x.gif"
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x@2.gif",
+                        "dpr": 2
+                    }
+                ],
+                "all_support": true
+            }
+        ]
+    },
+    {
+        "id": 33,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "test.png",
+            "formats": [
+                "webp",
+                "avif"
+            ],
+            "dprs": "3"
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x.webp"
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x@2.webp",
+                        "dpr": 2
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x@3.webp",
+                        "dpr": 3
+                    }
+                ]
+            },
+            {
+                "type": "image/avif",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x.avif"
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x@2.avif",
+                        "dpr": 2
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/x@3.avif",
+                        "dpr": 3
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": 34,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "formats": [
+                "webp",
+                "avif"
+            ]
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "test.png",
+            "segments": [
+                {
+                    "width": 200,
+                    "height": 200
+                }
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200.webp",
+                        "width": 200,
+                        "height": 200
+                    }
+                ]
+            },
+            {
+                "type": "image/avif",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-png/200x200.avif",
+                        "width": 200,
+                        "height": 200
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": 35,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "/thumbs/photo.jpg",
+            "segment": "thumb",
+            "format": "webp"
+        },
+        "expected": {
+            "type": "image/webp",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/thumbs/photo-jpg/thumb.webp"
+                }
+            ]
+        }
+    },
+    {
+        "id": 36,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "a/b/c.png",
+            "segment": "thumb",
+            "format": "webp"
+        },
+        "expected": {
+            "type": "image/webp",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/a/b/c-png/thumb.webp"
+                }
+            ]
+        }
+    },
+    {
+        "id": 37,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 2,
+            "options": {
+                "class": "photo",
+                "id": "main",
+                "alt": "Hello & <world>",
+                "lazy": true
+            }
+        },
+        "expected": "<picture class=\"photo\" id=\"main\">\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Hello &amp; &lt;world&gt;\" loading=\"lazy\" width=\"200\" height=\"200\">\n</picture>"
+    },
+    {
+        "id": 38,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.JPEG",
+            "segment": "thumb",
+            "format": "jpeg"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpeg/thumb.jpeg"
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 39,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200",
+            "format": "webp",
+            "dpr": 2
+        },
+        "expected": "https://imgs.example.com/images/photo-jpg/200x200@2.webp"
+    },
+    {
+        "id": 40,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "thumb",
+            "format": "webp",
+            "dpr": 3
+        },
+        "expected": "https://imgs.example.com/images/photo-jpg/thumb@3.webp"
+    },
+    {
+        "id": 41,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "thumb",
+            "format": "webp",
+            "dpr": 1
+        },
+        "expected": "https://imgs.example.com/images/photo-jpg/thumb.webp"
+    },
+    {
+        "id": 42,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "dpr": 2
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "thumb",
+            "format": "webp"
+        },
+        "expected": "https://imgs.example.com/images/photo-jpg/thumb@2.webp"
+    },
+    {
+        "id": 43,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "thumb",
+            "format": "webp",
+            "dpr": 0
+        },
+        "expected": "https://imgs.example.com/images/photo-jpg/thumb.webp"
+    },
+    {
+        "id": 44,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "dpr": 1
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "photo.jpg",
+            "segment": "200x200"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/photo-jpg/200x200.jpg",
+                    "width": 200,
+                    "height": 200
+                }
+            ],
+            "source_format": true,
+            "all_support": true
+        }
+    },
+    {
+        "id": 45,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 3
+        },
+        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x, /test-png/test-png/200x200@3.webp 3x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x, /test-png/test-png/200x200@3.png 3x\" width=\"200\" height=\"200\">\n</picture>"
+    },
+    {
+        "id": 46,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 3,
+            "options": {
+                "sizes": "(max-width: 600px) 100vw, 50vw"
+            }
+        },
+        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 200w, /test-png/test-png/200x200@2.webp 400w, /test-png/test-png/200x200@3.webp 600w\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 200w, /test-png/test-png/200x200@2.png 400w, /test-png/test-png/200x200@3.png 600w\" sizes=\"(max-width: 600px) 100vw, 50vw\" width=\"200\" height=\"200\">\n</picture>"
+    },
+    {
+        "id": 47,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp"
+            ],
+            "dprs": 3
+        },
+        "expected": "<img src=\"/test-png/test-png/200x200.webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x, /test-png/test-png/200x200@3.webp 3x\" width=\"200\" height=\"200\">"
+    },
+    {
+        "id": 48,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp"
+            ],
+            "dprs": 1
+        },
+        "expected": "<img src=\"/test-png/test-png/200x200.webp\" width=\"200\" height=\"200\">"
+    },
+    {
+        "id": 49,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": [
+                "x200",
+                "x400",
+                "x600"
+            ],
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 0
+        },
+        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/x200.webp 1x, /test-png/test-png/x400.webp 2x, /test-png/test-png/x600.webp 3x\">\n    <img src=\"/test-png/test-png/x200.png\" srcset=\"/test-png/test-png/x200.png 1x, /test-png/test-png/x400.png 2x, /test-png/test-png/x600.png 3x\" height=\"200\">\n</picture>"
+    },
+    {
+        "id": 50,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": null,
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 0
+        },
+        "expected": "<picture>\n    <source type=\"image/webp\" src=\"/test-png/test-png/x.webp\">\n    <img src=\"/test-png/test-png/x.png\">\n</picture>"
+    }
+]

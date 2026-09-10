@@ -1,0 +1,71 @@
+{
+    "name": "imager-client",
+    "version": "1.0.0",
+    "description": "Клиент микросервиса Imager: построение путей/URL ассетов (TypeScript)",
+    "homepage": "https://gitverse.ru/pkg-ru/imager",
+    "author": {
+        "name": "Vladislav Altukhov",
+        "url": "https://altuh.ru/about"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/pkg-ru/imager-client.git"
+    },
+    "readme": "README.md",
+    "support": {
+        "source": "https://gitverse.ru/pkg-ru/imager-client",
+        "docs": "https://gitverse.ru/pkg-ru/imager-client/README.md"
+    },
+    "keywords": [
+        "assets",
+        "imager",
+        "image",
+        "webp",
+        "avif",
+        "heif",
+        "heic",
+        "jpg",
+        "png",
+        "gif"
+    ],
+    "license": "GPL-3.0",
+    "exports": {
+        ".": {
+            "types": "./dist/imager-ts/index.d.ts",
+            "browser": "./dist/imager/index.js",
+            "default": "./dist/imager/index.js"
+        },
+        "./server": {
+            "types": "./dist/imager-ts-server/index.d.ts",
+            "node": "./dist/imager-server/index.js",
+            "default": "./dist/imager-server/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "doc",
+        "LICENSE",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "rollup -c rollup.config.js && tsc -p tsconfig.types.json",
+        "test": "tsc -p test/tsconfig.json && node test/dist/test/test.js",
+        "lint": "eslint src/imager-ts src/imager-ts-server test"
+    },
+    "devDependencies": {
+        "@types/node": "^22.13.11",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "@typescript-eslint/eslint-plugin": "^8.27",
+        "@typescript-eslint/parser": "^8.27",
+        "eslint": "^8.7",
+        "prettier": "^3.5",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "rollup": "^4.36.0",
+        "rollup-plugin-typescript2": "^0.36",
+        "tslib": "^2.8.1",
+        "typescript": "^5.8",
+        "uglify-js": "^3.19"
+    }
+}

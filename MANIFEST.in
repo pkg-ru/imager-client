@@ -1,0 +1,4 @@
+# Исходный дистрибутив (sdist): включаем документацию и лицензию
+include LICENSE
+include README.md
+recursive-include doc *.md

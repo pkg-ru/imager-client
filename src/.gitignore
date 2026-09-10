@@ -1,0 +1,5 @@
+/*/
+!/imager-*/
+!/imager/
+# Генерируется на этапе сборки PyPI-пакета (копия doc/ для wheel)
+/imager/doc/

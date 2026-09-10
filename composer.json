@@ -1,0 +1,37 @@
+{
+	"name": "pkg-ru/imager-client",
+	"description": "Клиент микросервиса Imager: построение путей ассетов и админ-методы",
+	"homepage": "https://gitverse.ru/pkg-ru/imager",
+	"support": {
+		"source": "https://gitverse.ru/pkg-ru/imager-client",
+		"docs": "https://gitverse.ru/pkg-ru/imager-client/README.md"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://gitverse.ru/pkg-ru/imager-client.git"
+	},
+	"type": "library",
+	"license": "GPL-3.0",
+	"readme": "README.md",
+	"authors": [
+		{
+			"name": "Altuhov Vladislav",
+			"homepage": "https://altuh.ru/about"
+		}
+	],
+	"require": {
+		"php": ">=8.1",
+		"ext-curl": "*"
+	},
+	"autoload": {
+		"psr-4": {
+			"imagerClient\\": "src/imager-php/"
+		},
+		"files": [
+			"src/imager-php/ImagerTypes.php"
+		]
+	},
+	"require-dev": {
+		"twig/twig": "^3.28"
+	}
+}

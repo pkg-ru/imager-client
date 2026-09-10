@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "declaration": false,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "jsx": "react-jsx",
+        "rootDir": "../../.."
+    },
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "../../../src/imager-ts/**/*.ts"
+    ]
+}

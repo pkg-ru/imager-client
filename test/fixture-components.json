@@ -1,0 +1,150 @@
+[
+    {
+        "id": 1,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {
+                "src": "/test.png",
+                "width": 200,
+                "height": 200,
+                "dpr": 2,
+                "format": "webp",
+                "alt": "Фото",
+                "class": "thumb"
+            }
+        },
+        "expected": {
+            "source": "/test.png",
+            "segments": {
+                "width": 200,
+                "height": 200
+            },
+            "formats": "webp",
+            "dprs": 2,
+            "options": {
+                "alt": "Фото",
+                "class": "thumb"
+            }
+        }
+    },
+    {
+        "id": 2,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {
+                "source": "/test.png",
+                "preset": "thumb",
+                "formats": [
+                    "webp",
+                    "avif"
+                ],
+                "lazy": true
+            }
+        },
+        "expected": {
+            "source": "/test.png",
+            "segments": "thumb",
+            "formats": [
+                "webp",
+                "avif"
+            ],
+            "dprs": null,
+            "options": {
+                "lazy": true
+            }
+        }
+    },
+    {
+        "id": 3,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {
+                "src": "/a.jpg",
+                "segment": "200x200",
+                "dprs": "3"
+            }
+        },
+        "expected": {
+            "source": "/a.jpg",
+            "segments": "200x200",
+            "formats": null,
+            "dprs": "3",
+            "options": {}
+        }
+    },
+    {
+        "id": 4,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {
+                "src": "/b.png",
+                "width": 400
+            }
+        },
+        "expected": {
+            "source": "/b.png",
+            "segments": {
+                "width": 400
+            },
+            "formats": null,
+            "dprs": null,
+            "options": {}
+        }
+    },
+    {
+        "id": 5,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {
+                "src": "/c.gif",
+                "segment": "thumb",
+                "preset": "200x200",
+                "width": 100
+            }
+        },
+        "expected": {
+            "source": "/c.gif",
+            "segments": "thumb",
+            "formats": null,
+            "dprs": null,
+            "options": {}
+        }
+    },
+    {
+        "id": 6,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {
+                "src": "/d.webp",
+                "format": "png",
+                "dpr": 1,
+                "sizes": "(max-width: 600px) 100vw, 50vw",
+                "id": "main"
+            }
+        },
+        "expected": {
+            "source": "/d.webp",
+            "segments": null,
+            "formats": "png",
+            "dprs": 1,
+            "options": {
+                "sizes": "(max-width: 600px) 100vw, 50vw",
+                "id": "main"
+            }
+        }
+    },
+    {
+        "id": 7,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {}
+        },
+        "expected": {
+            "source": "",
+            "segments": null,
+            "formats": null,
+            "dprs": null,
+            "options": {}
+        }
+    }
+]

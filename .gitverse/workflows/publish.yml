@@ -1,0 +1,128 @@
+name: Publish
+
+# Основной пайплайн релиза (GitVerse — основной репозиторий):
+# Все действия выполняются в одном контейнере (одна джоба build-test):
+#  1. сборка и единый golden-тест всех реализаций (TS, PHP, Python, Go)
+#     через оркестратор go run test/test.go;
+#  2. sync_version.py вызывается ровно один раз за пайплайн —
+#     только после успешного прохождения всех тестов;
+#  3. синхронизированные манифесты коммитятся в тег (force-push),
+#     чтобы .github публиковал из тега без повторного sync_version;
+#  4. после успешных тестов отправляем repository_dispatch в GitHub-зеркало
+#     (pkg-ru/imager-client), где npm и PyPI публикуются по OIDC
+#     (эти реестры интегрируются с GitHub Actions, но не с GitVerse)。
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-test:
+    name: Build, Test & Dispatch
+    # Защита от повторного запуска при force-push тега (после коммита манифестов):
+    # github.event.created == false при перемещении существующего тега。
+    if: github.event.created != false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      # Единый golden-тест для всех языков: оркестратор go run test/test.go
+      # запускает TS (npm test), PHP (php test/test.php), Python (python test/test.py)
+      # и Go-часть (RunGolden/RunAdmin) последовательно в одном шаге。
+      - name: Test all languages (go run test/test.go)
+        run: go run test/test.go
+
+      - name: Test React package
+        run: |
+          cd packages/react
+          npm ci
+          npm test
+
+      - name: Test Vue package
+        run: |
+          cd packages/vue
+          npm ci
+          npm test
+
+      - name: Install PHP dependencies (twig for extension test)
+        run: composer install --no-interaction
+
+      - name: Test Twig package
+        run: php packages/twig/test/test.php
+
+      # sync_version.py — ровно один раз за пайплайн и только после того,
+      # как все тесты прошли успешно (шаг выше упал бы при любой ошибке)。
+      - name: Sync version from tag
+        run: python scripts/sync_version.py "${{ github.ref_name }}"
+
+      # Коммитим синхронизированные манифесты в тег и force-push его,
+      # чтобы .github публиковал из тега с уже проставленной версией
+      # (без повторного sync_version.py там)。
+      - name: Commit synced manifests and update tag
+        id: sync-commit
+        env:
+          VERSE_TOKEN: ${{ secrets.VERSE_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          git config user.name "pkg-ru-bot"
+          git config user.email "pkg-ru-bot@gitverse.ru"
+          git add package.json pyproject.toml packages/react/package.json packages/vue/package.json
+          if git diff --cached --quiet; then
+            echo "Манифесты уже синхронизированы, коммит не нужен"
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: sync version to ${TAG#v}"
+            git push --force "https://x-access-token:${VERSE_TOKEN}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Отправляем repository_dispatchв GitHub-зеркало только при первом
+      # запуске (когда манифесты реально синхронизированы; при повторном
+      # запуске после force-push тега synced=false и dispatch не дублируется。
+      - name: Send repository_dispatch to GitHub
+        if: steps.sync-commit.outputs.synced == 'true'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          http_code=$(curl -sS -o /tmp/dispatch-response.json -w '%{http_code}' \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_PAT" \
+            https://api.github.com/repos/pkg-ru/imager-client/dispatches \
+            -d "{\"event_type\":\"publish\",\"client_payload\":{\"tag\":\"$TAG\"}}")
+          if [ "$http_code" != "204" ]; then
+            echo "GitHub API вернул $http_code:" >&2
+            cat /tmp/dispatch-response.json >&2
+            exit 1
+          fi
+          echo "repository_dispatch 'publish' (tag: $TAG) успешно отправлен в pkg-ru/imager-client"
