@@ -1,9 +1,7 @@
 name: Publish (npm + PyPI)
 
-# Публикация запускается двумя путями:
-
-#  1. repository_dispatch из GitVerse (основной репозиторий) после успешных тестов;
-#  2. прямой push тега v* в GitHub (резервный путь)。
+# Публикация запускается только по repository_dispatch из GitVerse
+# (основной репозиторий) после успешных тестов и синхронизации манифестов。
 # npm и PyPI поддерживают OIDC-публикацию только через GitHub Actions,
 # поэтому обе публикации живут здесь, без долгоживущих токенов。
 
@@ -12,11 +10,11 @@ name: Publish (npm + PyPI)
 
 # Все публикации выполняются в одном контейнере (одна джоба publish)。
 
+# Ветки и теги в этот репозиторий-зеркало синхронизирует mirror.yml из GitVerse
+# (см. .gitverse/workflows/mirror.yml)。Прямой push тега сюда НЕ запускает
+# публикацию — только repository_dispatch, чтобы исключить двойную публикацию。
 
 on:
-  push:
-    tags:
-      - 'v*'
   repository_dispatch:
     types: [publish]
 
@@ -31,19 +29,13 @@ jobs:
       id-token: write   # OIDC для npm provenance и PyPI Trusted Publisher
       contents: read
     steps:
-      # Определяем имя тега: при repository_dispatch тег приходит в payload,
-      # при push тега — из ref。
+      # Имя тега приходит в payload repository_dispatch из GitVerse。
       - name: Resolve tag name
         id: tag
         env:
           PAYLOAD_TAG: ${{ github.event.client_payload.tag }}
-          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -n "$PAYLOAD_TAG" ]; then
-            TAG="$PAYLOAD_TAG"
-          else
-            TAG="$REF_NAME"
-          fi
+          TAG="$PAYLOAD_TAG"
           case "$TAG" in
             v*) ;;
             *) echo "Некорректный тег: $TAG" >&2; exit 1 ;;

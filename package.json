@@ -1,6 +1,6 @@
 {
     "name": "imager-client",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "Клиент микросервиса Imager: построение путей/URL ассетов (TypeScript)",
     "homepage": "https://gitverse.ru/pkg-ru/imager",
     "author": {
@@ -9,12 +9,16 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/pkg-ru/imager-client.git"
+        "url": "git+https://gitverse.ru/pkg-ru/imager-client.git"
     },
     "readme": "README.md",
     "support": {
         "source": "https://gitverse.ru/pkg-ru/imager-client",
         "docs": "https://gitverse.ru/pkg-ru/imager-client/README.md"
+    },
+    "mirror": {
+        "type": "git",
+        "url": "https://github.com/pkg-ru/imager-client.git"
     },
     "keywords": [
         "assets",

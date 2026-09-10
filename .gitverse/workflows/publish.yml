@@ -8,9 +8,14 @@ name: Publish
 #     только после успешного прохождения всех тестов;
 #  3. синхронизированные манифесты коммитятся в тег (force-push),
 #     чтобы .github публиковал из тега без повторного sync_version;
-#  4. после успешных тестов отправляем repository_dispatch в GitHub-зеркало
+#  4. тег с манифестами force-pushится в GitHub-зеркало сразу здесь
+#     (без гонки с mirror.yml), чтобы GitHub-воркфлоу сделал checkout
+#     тега с уже проставленной версией;
+#  5. после успешных тестов отправляем repository_dispatch в GitHub-зеркало
 #     (pkg-ru/imager-client), где npm и PyPI публикуются по OIDC
 #     (эти реестры интегрируются с GitHub Actions, но не с GitVerse)。
+# Ветки и теги в GitHub также синхронизирует mirror.yml
+# (см. .gitverse/workflows/mirror.yml)。
 
 on:
   push:
@@ -95,7 +100,7 @@ jobs:
         run: |
           git config user.name "pkg-ru-bot"
           git config user.email "pkg-ru-bot@gitverse.ru"
-          git add package.json pyproject.toml packages/react/package.json packages/vue/package.json
+          git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json
           if git diff --cached --quiet; then
             echo "Манифесты уже синхронизированы, коммит не нужен"
             echo "synced=false" >> "$GITHUB_OUTPUT"
@@ -105,7 +110,21 @@ jobs:
             echo "synced=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Отправляем repository_dispatchв GitHub-зеркало только при первом
+      # Force-push тега в GitHub-зеркало сразу здесь, до отправки dispatch:
+      # гарантирует, что GitHub-воркфлоу сделает checkout тега с уже
+      # проставленной версией, без гонки с mirror.yml (который тоже пушит
+      # теги, но может отработать позже)。Выполняется всегда — даже если
+      # манифесты уже были синхронизированы (synced=false), тег в GitHub
+      # мог остаться старым。
+      - name: Push tag to GitHub mirror
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          git push --force "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
+          echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitHub-зеркало"
+
+      # Отправляем repository_dispatch в GitHub-зеркало только при первом
       # запуске (когда манифесты реально синхронизированы; при повторном
       # запуске после force-push тега synced=false и dispatch не дублируется。
       - name: Send repository_dispatch to GitHub

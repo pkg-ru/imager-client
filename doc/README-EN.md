@@ -4,6 +4,8 @@ Client library for the **Imager** microservice for four languages — Python, PH
 
 > Requires a configured and running [Imager microservice](https://gitverse.ru/pkg-ru/imager).
 
+> **Primary repository:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Mirror:** [GitHub](https://github.com/pkg-ru/imager-client)
+
 ## Documentation: [RU](../README.md) / **EN**
 
 - [Python](./PY-EN.md)

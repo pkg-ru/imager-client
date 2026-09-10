@@ -4,6 +4,8 @@
 
 > Для работы нужен настроенный и запущенный [микросервис Imager](https://gitverse.ru/pkg-ru/imager).
 
+> **Основной репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Зеркало:** [GitHub](https://github.com/pkg-ru/imager-client)
+
 ## Документация: **RU** / [EN](./doc/README-EN.md)
 
 - [Python](./doc/PY-RU.md)
