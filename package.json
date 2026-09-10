@@ -9,7 +9,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://gitverse.ru/pkg-ru/imager-client.git"
+        "url": "https://github.com/pkg-ru/imager-client"
     },
     "readme": "README.md",
     "support": {
@@ -18,7 +18,7 @@
     },
     "mirror": {
         "type": "git",
-        "url": "https://github.com/pkg-ru/imager-client.git"
+        "url": "https://gitverse.ru/pkg-ru/imager-client.git"
     },
     "keywords": [
         "assets",

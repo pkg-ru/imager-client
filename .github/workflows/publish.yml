@@ -26,7 +26,7 @@ jobs:
     name: Publish (npm + PyPI)
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # OIDC для npm provenance и PyPI Trusted Publisher
+      id-token: write   # OIDC для npm provenance, PyPI Trusted Publisher и npm OIDC publishing
       contents: read
     steps:
       # Имя тега приходит в payload repository_dispatch из GitVerse。
@@ -48,11 +48,13 @@ jobs:
         with:
           ref: ${{ steps.tag.outputs.tag }}
 
-      - name: Setup Node.js 24 (npm provenance requires Node >=  ​24)
+      # registry-url НЕ указываем: он создаёт .npmrc с _authToken=${NODE_AUTH_TOKEN},
+      # а пустой токен перебивает OIDC-аутентификацию npm publish.
+      # npm OIDC publishing сам получает токен из окружения GitHub Actions.
+      - name: Setup Node.js 24 (npm provenance requires Node >= 24)
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -65,7 +67,7 @@ jobs:
       - name: Build core (imager-client)
         run: npm run build
 
-      - name: Publish core to npm (OIDC provenance, no token)
+      - name: Publish core to npm (OIDC publishing + provenance, no token)
         run: npm publish --provenance --access public
 
       - name: Publish @pkg-ru/imager-react to npm
