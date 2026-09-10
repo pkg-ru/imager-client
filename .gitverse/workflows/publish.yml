@@ -124,11 +124,12 @@ jobs:
           git push --force "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
           echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitHub-зеркало"
 
-      # Отправляем repository_dispatch в GitHub-зеркало только при первом
-      # запуске (когда манифесты реально синхронизированы; при повторном
-      # запуске после force-push тега synced=false и dispatch не дублируется。
+      # Отправляем repository_dispatch в GitHub-зеркало при каждом первом
+      # запуске (created=true). Защита от дублирования — на уровне job:
+      # повторный запуск после force-push тега (created=false) пропускается。
+      # Dispatch отправляется всегда, даже если манифесты уже были
+      # синхронизированы (synced=false) — иначе публикация не запустится。
       - name: Send repository_dispatch to GitHub
-        if: steps.sync-commit.outputs.synced == 'true'
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
           TAG: ${{ github.ref_name }}
