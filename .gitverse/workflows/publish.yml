@@ -11,10 +11,14 @@ name: Publish
 #  4. тот же коммит с версией пушится в master (без force-push),
 #     чтобы ветка не расходилась с тегом; если master ушёл вперёд
 #     (тег создан не из master), push пропускается с предупреждением;
-#  5. тег с манифестами force-pushится в GitHub-зеркало сразу здесь
+#  5. Twig-пакет (packages/twig) публикуется в отдельный GitHub-репозиторий
+#     pkg-ru/imager-twig: содержимое коммитится в master (без force-push)
+#     и в тег v<версия> (force-push), чтобы composer мог установить пакет
+#     по тегу (composer require pkg-ru/imager-twig:^2.0.1);
+#  6. тег с манифестами force-pushится в GitHub-зеркало сразу здесь
 #     (без гонки с mirror.yml), чтобы GitHub-воркфлоу сделал checkout
 #     тега с уже проставленной версией;
-#  6. после успешных тестов отправляем repository_dispatch в GitHub-зеркало
+#  7. после успешных тестов отправляем repository_dispatch в GitHub-зеркало
 #     (pkg-ru/imager-client), где npm и PyPI публикуются по OIDC
 #     (эти реестры интегрируются с GitHub Actions, но не с GitVerse)。
 # Ветки и теги в GitHub также синхронизирует mirror.yml
@@ -132,6 +136,36 @@ jobs:
             cat /tmp/push-master.err >&2
             echo "Версия ${TAG#v} осталась только в теге ${TAG}"
           fi
+
+      # Публикуем Twig-пакет в отдельный GitHub-репозиторий pkg-ru/imager-twig
+      # (composer-пакет). Содержимое packages/twig (composer.json, README.md,
+      # src/, test/) коммитится в отдельный git-репозиторий и пушится:
+      #   - в master (без force) — чтобы ветка не расходилась с тегом;
+      #   - в тег v<версия> (force-push) — чтобы composer мог установить
+      #     пакет по тегу (composer require pkg-ru/imager-twig:^2.0.1).
+      # Версия в composer.json уже проставлена sync_version.py выше。
+      - name: Publish Twig package to pkg-ru/imager-twig
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd packages/twig
+          git init -q
+          git config user.name "pkg-ru-bot"
+          git config user.email "pkg-ru-bot@users.noreply.github.com"
+          git add composer.json README.md src test
+          git commit -q -m "chore: release ${TAG}"
+          # master: без force, чтобы не затирать историю репозитория пакета
+          if git push "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-twig.git" "HEAD:refs/heads/master" 2>/tmp/push-twig-master.err; then
+            echo "Twig-пакет ${TAG} запушен в master репозитория pkg-ru/imager-twig"
+          else
+            echo "ВНИМАНИЕ: push twig в master не удался (вероятно, master ушёл вперёд)." >&2
+            cat /tmp/push-twig-master.err >&2
+          fi
+          # тег: force-push, чтобы composer-версия всегда соответствовала релизу
+          git push --force "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-twig.git" "HEAD:refs/tags/${TAG}"
+          echo "Twig-пакет ${TAG} запушен в тег ${TAG} репозитория pkg-ru/imager-twig"
 
       # Force-push тега в GitHub-зеркало сразу здесь, до отправки dispatch:
       # гарантирует, что GitHub-воркфлоу сделает checkout тега с уже
