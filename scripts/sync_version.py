@@ -5,8 +5,10 @@
 в package.json и package-lock.json (npm), pyproject.toml (PyPI)
 и манифестах фреймворк-пакетов (packages/react, packages/vue)
 перед сборкой/публикацией. Версия фреймворк-пакетов — та же,
-что у основных пакетов (из тега). composer.json (twig) не трогаем:
-Packagist берёт версию из git-тега.
+что у основных пакетов (из тега). Также обновляются диапазоны
+зависимостей от imager-client: peerDependencies.imager-client
+(>=версия) в packages/react и packages/vue (включая lock-файлы)
+и require.pkg-ru/imager-client (^версия) в packages/twig/composer.json.
 
 Использование:
     python scripts/sync_version.py v1.2.3
@@ -32,6 +34,8 @@ FRAMEWORK_PACKAGE_LOCK_JSONS = [
     ROOT / "packages" / "react" / "package-lock.json",
     ROOT / "packages" / "vue" / "package-lock.json",
 ]
+# Twig-пакет: диапазон зависимости от imager-client (^версия).
+TWIG_COMPOSER_JSON = ROOT / "packages" / "twig" / "composer.json"
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 
@@ -76,6 +80,54 @@ def sync_package_lock_json(path: Path, version: str) -> None:
     print(f"{path.relative_to(ROOT)}: version -> {version}")
 
 
+def sync_peer_dependency(path: Path, version: str) -> None:
+    """Обновляет peerDependencies.imager-client (>=версия).
+
+    В package.json peerDependencies лежит на верхнем уровне,
+    в package-lock.json — внутри packages[''].
+    """
+    data = json.loads(path.read_text(encoding="utf-8"))
+    containers = [data]
+    packages = data.get("packages")
+    if isinstance(packages, dict) and "" in packages:
+        containers.append(packages[""])
+    updated = False
+    for container in containers:
+        peers = container.get("peerDependencies")
+        if isinstance(peers, dict) and "imager-client" in peers:
+            peers["imager-client"] = f">={version}"
+            updated = True
+    if not updated:
+        raise SystemExit(
+            f"{path.relative_to(ROOT)}: peerDependencies.imager-client не найдено"
+        )
+    path.write_text(
+        json.dumps(data, indent=4, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(f"{path.relative_to(ROOT)}: peerDependencies.imager-client -> >={version}")
+
+
+def sync_composer_require(version: str) -> None:
+    """Обновляет require['pkg-ru/imager-client'] (^версия) в composer.json."""
+    data = json.loads(TWIG_COMPOSER_JSON.read_text(encoding="utf-8"))
+    require = data.get("require", {})
+    if "pkg-ru/imager-client" not in require:
+        raise SystemExit(
+            f"{TWIG_COMPOSER_JSON.relative_to(ROOT)}: "
+            "require['pkg-ru/imager-client'] не найдено"
+        )
+    require["pkg-ru/imager-client"] = f"^{version}"
+    TWIG_COMPOSER_JSON.write_text(
+        json.dumps(data, indent=4, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(
+        f"{TWIG_COMPOSER_JSON.relative_to(ROOT)}: "
+        f"require['pkg-ru/imager-client'] -> ^{version}"
+    )
+
+
 def sync_pyproject_toml(version: str) -> None:
     text = PYPROJECT_TOML.read_text(encoding="utf-8")
     new_text, count = re.subn(
@@ -100,8 +152,11 @@ def main() -> None:
     sync_pyproject_toml(version)
     for path in FRAMEWORK_PACKAGE_JSONS:
         sync_package_json(path, version)
+        sync_peer_dependency(path, version)
     for path in FRAMEWORK_PACKAGE_LOCK_JSONS:
         sync_package_lock_json(path, version)
+        sync_peer_dependency(path, version)
+    sync_composer_require(version)
 
 
 if __name__ == "__main__":

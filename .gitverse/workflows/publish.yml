@@ -106,7 +106,7 @@ jobs:
         run: |
           git config user.name "pkg-ru-bot"
           git config user.email "pkg-ru-bot@gitverse.ru"
-          git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json
+          git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json packages/twig/composer.json
           if git diff --cached --quiet; then
             echo "Манифесты уже синхронизированы, коммит не нужен"
             echo "synced=false" >> "$GITHUB_OUTPUT"

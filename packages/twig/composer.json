@@ -6,7 +6,7 @@
     "require": {
         "php": ">=8.0",
         "twig/twig": "^3.0",
-        "pkg-ru/imager-client": "^1.0"
+        "pkg-ru/imager-client": "^2.0.0"
     },
     "autoload": {
         "psr-4": {
