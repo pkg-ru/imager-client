@@ -8,10 +8,13 @@ Client library for the **Imager** microservice for four languages — Python, PH
 
 ## Documentation: [RU](../README.md) / **EN**
 
-- [Python](./PY-EN.md)
-- [PHP](./PHP-EN.md)
-- [TypeScript (client + server)](./TS-EN.md)
-- [Go](./GO-EN.md)
+- [Python](./PY-EN.md) — package on [PyPI](https://pypi.org/project/imager_client/)
+- [PHP](./PHP-EN.md) — package on [Packagist](https://packagist.org/packages/pkg-ru/imager-client)
+  - [Twig](../packages/twig/README.md) — package on [Packagist](https://packagist.org/packages/pkg-ru/imager-twig)
+- [TypeScript (client + server)](./TS-EN.md) — package on [npm](https://www.npmjs.com/package/imager-client)
+  - [Vue](../packages/vue/README.md) — package on [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue)
+  - [React](../packages/react/README.md) — package on [npm](https://www.npmjs.com/package/@pkg-ru/imager-react)
+- [Go](./GO-EN.md) — module on [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client)
 
 ---
 

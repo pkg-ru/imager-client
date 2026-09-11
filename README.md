@@ -8,10 +8,13 @@
 
 ## Документация: **RU** / [EN](./doc/README-EN.md)
 
-- [Python](./doc/PY-RU.md)
-- [PHP](./doc/PHP-RU.md)
-- [TypeScript (клиент + сервер)](./doc/TS-RU.md)
-- [Go](./doc/GO-RU.md)
+- [Python](./doc/PY-RU.md) — пакет на [PyPI](https://pypi.org/project/imager_client/)
+- [PHP](./doc/PHP-RU.md) — пакет на [Packagist](https://packagist.org/packages/pkg-ru/imager-client)
+  - [Twig](./packages/twig/README.md) — пакет на [Packagist](https://packagist.org/packages/pkg-ru/imager-twig)
+- [TypeScript (клиент + сервер)](./doc/TS-RU.md) — пакет на [npm](https://www.npmjs.com/package/imager-client)
+  - [Vue](./packages/vue/README.md) — пакет на [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue)
+  - [React](./packages/react/README.md) — пакет на [npm](https://www.npmjs.com/package/@pkg-ru/imager-react)
+- [Go](./doc/GO-RU.md) — модуль на [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client)
 
 ---
 
