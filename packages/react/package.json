@@ -1,6 +1,6 @@
 {
     "name": "@pkg-ru/imager-react",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "description": "React-компоненты для микросервиса Imager: ImagerPlugin, ImagerProvider, ImagerAssets, ImagerAsset",
     "license": "GPL-3.0",
     "main": "./dist/index.cjs",
