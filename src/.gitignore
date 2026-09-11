@@ -1,5 +1,5 @@
 /*/
 !/imager-*/
 !/imager/
-# Генерируется на этапе сборки PyPI-пакета (копия doc/ для wheel)
-/imager/doc/
+# Генерируется на этапе сборки PyPI-пакета (копия doc/PY-RU.md для wheel)
+/imager/README.md

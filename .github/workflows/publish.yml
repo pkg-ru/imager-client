@@ -87,12 +87,12 @@ jobs:
       - name: Install build tools (PyPI)
         run: python -m pip install --upgrade build twine
 
-      # Документация должна попасть в sdist и wheel: копируем doc/*.md
-      # внутрь пакета imager (подключено как package-data в pyproject.toml)
-      - name: Copy docs into package
+      # README для PyPI (doc/PY-RU.md) должен попасть в wheel:
+      # копируем его внутрь пакета imager как README.md
+      # (подключено как package-data в pyproject.toml)
+      - name: Copy README into package
         run: |
-          mkdir -p src/imager/doc
-          cp doc/*.md src/imager/doc/
+          cp doc/PY-RU.md src/imager/README.md
 
       # Собираем в отдельную папку dist-python: dist/ уже занята npm-сборкой
       # (dist/imager, dist/imager-server), и twine check падал бы на этих

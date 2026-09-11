@@ -1,4 +1,4 @@
-# Исходный дистрибутив (sdist): включаем документацию и лицензию
+# Исходный дистрибутив (sdist): включаем лицензию.
+# README для PyPI (doc/PY-RU.md) попадает в sdist автоматически
+# как readme из pyproject.toml.
 include LICENSE
-include README.md
-recursive-include doc *.md

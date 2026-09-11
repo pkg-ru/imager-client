@@ -2,8 +2,8 @@
 
 Клиент микросервиса **Imager** на Python: построение путей/URL ассетов и админ-методы.
 
-- [English version](./PY-EN.md)
-- [Обзор](../README.md)
+- [English version](https://gitverse.ru/pkg-ru/imager-client/blob/master/doc/PY-EN.md)
+- [Обзор](https://gitverse.ru/pkg-ru/imager-client/blob/master/README.md)
 
 ---
 
@@ -337,6 +337,6 @@ ok = admin.AdminDelete(asset, wait=False)          # DELETE .../admin/assets/del
 python test/test.py
 ```
 
-Раннер читает [`test/fixture.json`](../test/fixture.json) и выполняет golden-кейсы. Полный прогон всех языков — `make test` (оркестратор — `go run test/test.go`).
+Раннер читает [`test/fixture.json`](https://gitverse.ru/pkg-ru/imager-client/blob/master/test/fixture.json) и выполняет golden-кейсы. Полный прогон всех языков — `make test` (оркестратор — `go run test/test.go`).
 
 © 2025 [Алтухов Владислав Владимирович](https://altuh.ru/about)

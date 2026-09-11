@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "imager_client"
 version = "2.0.3"
 description = "Клиент микросервиса Imager: построение путей/URL ассетов и админ-методы"
-readme = "README.md"
+readme = "doc/PY-RU.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
 authors = [
@@ -30,7 +30,7 @@ packages = ["imager"]
 [tool.setuptools.package-dir]
 imager = "src/imager"
 
-# Документация копируется в src/imager/doc/ на этапе сборки (шаг в CI),
-# чтобы попасть в wheel как package-data.
+# README.md копируется из doc/PY-RU.md в src/imager/README.md на этапе
+# сборки (шаг в CI), чтобы попасть в wheel как package-data.
 [tool.setuptools.package-data]
-imager = ["doc/*.md"]
+imager = ["README.md"]
