@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "imager_client"
-version = "2.0.1"
+version = "2.0.2"
 description = "Клиент микросервиса Imager: построение путей/URL ассетов и админ-методы"
 readme = "README.md"
 requires-python = ">=3.10"
