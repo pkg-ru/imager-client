@@ -104,7 +104,7 @@ export function App() {
 ## Алиасы props
 
 | Алиас | Канонический | Пример |
-|---|---|---|---|
+|---|---|---|
 | `src` | `source` | `<ImagerAssets src="/a.png" />` |
 | `preset` | `segment` | `<ImagerAssets preset="thumb" />` |
 | `width`/`height` | `segment` | `<ImagerAssets width={200} height={200} />` |
