@@ -1,0 +1,37 @@
+# CI-образ не должен содержать исходники проекта, зависимости и артефакты.
+# Эти пути исключаются из build context (ускоряет сборку и защищает layer cache).
+
+# --- Зависимости и кэши пакетов ---
+node_modules/
+packages/*/node_modules/
+vendor/
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+imager_client.egg-info/
+
+# --- Артефакты сборки ---
+dist/
+dist-python/
+build/
+test/dist/
+packages/*/dist/
+packages/*/dist-test/
+src/imager-ts/*.js
+src/imager-ts-server/*.js
+packages/*/test/*.js
+
+# --- VCS и локальные окружения ---
+.git/
+.github/
+.gitverse/workflows/
+.gitverse/docker/imager-ci/README.md
+act/
+.hg/
+.svn/
+
+# --- Локальные файлы ---
+*.log
+.DS_Store
+Thumbs.db

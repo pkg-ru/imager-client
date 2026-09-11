@@ -2,7 +2,7 @@
 
 Twig-расширение для микросервиса [Imager](https://gitverse.ru/pkg-ru/imager).
 
-Тонкая обёртка над ядром [`pkg-ru/imager-client`](../../README.md): вся логика
+Тонкая обёртка над ядром [`pkg-ru/imager-client`](https://packagist.org/packages/pkg-ru/imager-client): вся логика
 (сегменты, dpr, форматы, srcset) — в ядре, расширение нормализует алиасы
 аргументов и вызывает `GetAssetsHtml` / `GetAssetPath`.
 
