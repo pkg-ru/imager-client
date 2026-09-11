@@ -14,7 +14,7 @@
 - [TypeScript (клиент + сервер)](./doc/TS-RU.md) — пакет на [npm](https://www.npmjs.com/package/imager-client)
   - [Vue](./packages/vue/README.md) — пакет на [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue)
   - [React](./packages/react/README.md) — пакет на [npm](https://www.npmjs.com/package/@pkg-ru/imager-react)
-- [Go](./doc/GO-RU.md) — модуль на [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client)
+- [Go](./doc/GO-RU.md) — модуль на [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2)
 
 ---
 
@@ -33,7 +33,7 @@
 | Python | `imager_client` (PyPI) | `pip install imager_client` |
 | PHP | `pkg-ru/imager-client` (Composer) | `composer require pkg-ru/imager-client` |
 | TypeScript | `imager-client` (npm) | `npm install imager-client` |
-| Go | `gitverse.ru/pkg-ru/imager-client` | `go get gitverse.ru/pkg-ru/imager-client` |
+| Go | `gitverse.ru/pkg-ru/imager-client/v2` | `go get gitverse.ru/pkg-ru/imager-client/v2` |
 
 ## Фреймворк-компоненты
 
@@ -119,7 +119,7 @@ await server.AdminGenerate("/test.gif", true);
 ### Go
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/src/imager-go"
+import imager "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",

@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	imagergo "gitverse.ru/pkg-ru/imager-client/src/imager-go"
+	imagergo "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
 )
 
 // ------------------------------------------------------------------ //

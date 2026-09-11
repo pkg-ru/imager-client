@@ -9,16 +9,16 @@
 
 ## Installation
 
-Module `gitverse.ru/pkg-ru/imager-client` (go 1.23.7+, package `imager`, no external dependencies):
+Module `gitverse.ru/pkg-ru/imager-client/v2` (go 1.23.7+, package `imager`, no external dependencies):
 
 ```bash
-go get gitverse.ru/pkg-ru/imager-client
+go get gitverse.ru/pkg-ru/imager-client/v2
 ```
 
 Import:
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/src/imager-go"
+import imager "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
 ```
 
 ## Initialization
@@ -270,7 +270,7 @@ i.GetAssets("/test.gif", []any{"200x200", "x400"}, []any{"webp", "gif"}, 2)  // 
 ## Examples
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/src/imager-go"
+import imager "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",

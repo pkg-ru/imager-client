@@ -14,7 +14,7 @@ Client library for the **Imager** microservice for four languages — Python, PH
 - [TypeScript (client + server)](./TS-EN.md) — package on [npm](https://www.npmjs.com/package/imager-client)
   - [Vue](../packages/vue/README.md) — package on [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue)
   - [React](../packages/react/README.md) — package on [npm](https://www.npmjs.com/package/@pkg-ru/imager-react)
-- [Go](./GO-EN.md) — module on [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client)
+- [Go](./GO-EN.md) — module on [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2)
 
 ---
 
@@ -33,7 +33,7 @@ Client library for the **Imager** microservice for four languages — Python, PH
 | Python | `imager_client` (PyPI) | `pip install imager_client` |
 | PHP | `pkg-ru/imager-client` (Composer) | `composer require pkg-ru/imager-client` |
 | TypeScript | `imager-client` (npm) | `npm install imager-client` |
-| Go | `gitverse.ru/pkg-ru/imager-client` | `go get gitverse.ru/pkg-ru/imager-client` |
+| Go | `gitverse.ru/pkg-ru/imager-client/v2` | `go get gitverse.ru/pkg-ru/imager-client/v2` |
 
 ## Framework components
 
@@ -119,7 +119,7 @@ await server.AdminGenerate("/test.gif", true);
 ### Go
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/src/imager-go"
+import imager "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",
