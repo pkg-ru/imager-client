@@ -8,10 +8,13 @@ name: Publish
 #     только после успешного прохождения всех тестов;
 #  3. синхронизированные манифесты коммитятся в тег (force-push),
 #     чтобы .github публиковал из тега без повторного sync_version;
-#  4. тег с манифестами force-pushится в GitHub-зеркало сразу здесь
+#  4. тот же коммит с версией пушится в master (без force-push),
+#     чтобы ветка не расходилась с тегом; если master ушёл вперёд
+#     (тег создан не из master), push пропускается с предупреждением;
+#  5. тег с манифестами force-pushится в GitHub-зеркало сразу здесь
 #     (без гонки с mirror.yml), чтобы GitHub-воркфлоу сделал checkout
 #     тега с уже проставленной версией;
-#  5. после успешных тестов отправляем repository_dispatch в GitHub-зеркало
+#  6. после успешных тестов отправляем repository_dispatch в GitHub-зеркало
 #     (pkg-ru/imager-client), где npm и PyPI публикуются по OIDC
 #     (эти реестры интегрируются с GitHub Actions, но не с GitVerse)。
 # Ветки и теги в GitHub также синхронизирует mirror.yml
@@ -111,6 +114,23 @@ jobs:
             git commit -m "chore: sync version to ${TAG#v}"
             git push --force "https://x-access-token:${VERSE_TOKEN}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
             echo "synced=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Пушим синхронизированные манифесты ещё и в master, чтобы ветка
+      # не расходилась с тегом. Без --force: если master ушёл вперёд
+      # (тег создан не из master), push упадёт — пропускаем с предупреждением,
+      # версия остаётся только в теге, публикация продолжается。
+      - name: Push version to master
+        env:
+          VERSE_TOKEN: ${{ secrets.VERSE_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if git push "https://x-access-token:${VERSE_TOKEN}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/heads/master" 2>/tmp/push-master.err; then
+            echo "Версия ${TAG#v} запушена в master"
+          else
+            echo "ВНИМАНИЕ: push в master не удался (вероятно, master ушёл вперёд)." >&2
+            cat /tmp/push-master.err >&2
+            echo "Версия ${TAG#v} осталась только в теге ${TAG}"
           fi
 
       # Force-push тега в GitHub-зеркало сразу здесь, до отправки dispatch:
