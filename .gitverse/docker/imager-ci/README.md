@@ -47,6 +47,25 @@ docker run --rm \
 (аутентификация в GitVerse Container Registry — через `--registry-*` флаги
 или `docker login` на хосте с Docker daemon).
 
+## Публикация в GitVerse Container Registry
+
+```bash
+# 1. Собрать образ
+docker build -f .gitverse/docker/imager-ci/Dockerfile -t gitverse.ru/pkg-ru/imager-ci:2026.09.1 .
+
+# 2. Войти в registry (username — имя пользователя GitVerse)
+docker login gitverse.ru
+
+# 3. Опубликовать
+docker push gitverse.ru/pkg-ru/imager-ci:2026.09.1
+```
+
+После публикации проверить доступность:
+
+```bash
+docker pull gitverse.ru/pkg-ru/imager-ci:2026.09.1
+```
+
 ## Тестирование образа
 
 ```bash
@@ -94,3 +113,11 @@ gitverse.ru/pkg-ru/imager-ci:<version>
 Это Docker-образ (не Git-репозиторий). Для pull на cloud runner образ должен
 быть публичным, либо runner должен иметь доступ к registry (см. документацию
 GitVerse по аутентификации runner в Container Registry).
+
+## Текущий статус (2026-09-11)
+
+- Образ `gitverse.ru/pkg-ru/imager-ci:2026.09.1` **опубликован** в GitVerse
+  Container Registry (digest `sha256:5b0775fc68cce04a226d0ba9cddc4ad4f96738cebe71d88fd74a38f3d69a4e1e`).
+- Образ **публичный** — pull без аутентификации работает (проверено).
+- Размер: **~975 MB** (после multi-stage оптимизации; лимит blob GitVerse
+  Registry соблюдён — push прошёл без ошибки 413).
