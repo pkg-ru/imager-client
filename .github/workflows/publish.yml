@@ -94,11 +94,16 @@ jobs:
           mkdir -p src/imager/doc
           cp doc/*.md src/imager/doc/
 
+      # Собираем в отдельную папку dist-python: dist/ уже занята npm-сборкой
+      # (dist/imager, dist/imager-server), и twine check падал бы на этих
+      # директориях с "Unknown distribution format".
       - name: Build distribution
-        run: python -m build
+        run: python -m build --outdir dist-python
 
       - name: Check distribution
-        run: python -m twine check dist/*
+        run: python -m twine check dist-python/*
 
       - name: Publish to PyPI (OIDC Trusted Publisher, no token)
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-python

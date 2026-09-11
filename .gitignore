@@ -4,6 +4,7 @@ node_modules/
 __pycache__/
 .pytest_cache/
 dist/*
+dist-python/
 test/dist/
 build/
 *.egg-info/
