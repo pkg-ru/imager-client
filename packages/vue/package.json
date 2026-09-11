@@ -1,6 +1,6 @@
 {
     "name": "@pkg-ru/imager-vue",
-    "version": "2.0.2",
+    "version": "2.0.3",
     "description": "Vue 3-компоненты для микросервиса Imager: ImagerPlugin, ImagerProvider, ImagerAssets, ImagerAsset",
     "license": "GPL-3.0",
     "main": "./dist/index.cjs",
@@ -32,7 +32,7 @@
         "test": "tsc -p tsconfig.test.json && node dist-test/imager-client/packages/vue/test/test.js"
     },
     "peerDependencies": {
-        "imager-client": ">=2.0.2",
+        "imager-client": ">=2.0.3",
         "vue": ">=3.2.0"
     },
     "peerDependenciesMeta": {
