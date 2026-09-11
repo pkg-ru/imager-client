@@ -21,7 +21,10 @@
 
 PHP-расширения: `curl` (требует `composer.json` + `src/imager-php/Imager.php`),
 `iconv` (требует `symfony/polyfill-mbstring` из `composer.lock`). `ctype`,
-`mbstring`, `json`, `openssl`, `zlib` встроены в PHP 8.1. XML/zip не нужны.
+`mbstring`, `json`, `openssl`, `zlib` встроены в PHP 8.1. PHP-расширения
+XML/zip не нужны, но системный `unzip` установлен: dist-источники пакетов
+(`twig/twig`, `symfony/*`) в `composer.lock` — zipball'ы с GitHub API, и без
+`unzip`/7z Composer откатывается на `git clone` (таймаут 300 с в пайплайне).
 
 ## Сборка
 
@@ -29,7 +32,7 @@ PHP-расширения: `curl` (требует `composer.json` + `src/imager-p
 
 ```bash
 docker build -f .gitverse/docker/imager-ci/Dockerfile \
-  -t gitverse.ru/pkg-ru/imager-ci:2026.09.1 .
+  -t gitverse.ru/pkg-ru/imager-ci:2026.09.2 .
 ```
 
 В GitVerse (cloud runner без Docker daemon) — через **Kaniko**:
@@ -37,11 +40,11 @@ docker build -f .gitverse/docker/imager-ci/Dockerfile \
 ```bash
 docker run --rm \
   -v "$PWD":/workspace \
-  -e DESTINATION=gitverse.ru/pkg-ru/imager-ci:2026.09.1 \
+  -e DESTINATION=gitverse.ru/pkg-ru/imager-ci:2026.09.2 \
   gcr.io/kaniko-project/executor:latest \
   --context=/workspace \
   --dockerfile=/workspace/.gitverse/docker/imager-ci/Dockerfile \
-  --destination=gitverse.ru/pkg-ru/imager-ci:2026.09.1
+  --destination=gitverse.ru/pkg-ru/imager-ci:2026.09.2
 ```
 
 (аутентификация в GitVerse Container Registry — через `--registry-*` флаги
@@ -51,19 +54,19 @@ docker run --rm \
 
 ```bash
 # 1. Собрать образ
-docker build -f .gitverse/docker/imager-ci/Dockerfile -t gitverse.ru/pkg-ru/imager-ci:2026.09.1 .
+docker build -f .gitverse/docker/imager-ci/Dockerfile -t gitverse.ru/pkg-ru/imager-ci:2026.09.2 .
 
 # 2. Войти в registry (username — имя пользователя GitVerse)
 docker login gitverse.ru
 
 # 3. Опубликовать
-docker push gitverse.ru/pkg-ru/imager-ci:2026.09.1
+docker push gitverse.ru/pkg-ru/imager-ci:2026.09.2
 ```
 
 После публикации проверить доступность:
 
 ```bash
-docker pull gitverse.ru/pkg-ru/imager-ci:2026.09.1
+docker pull gitverse.ru/pkg-ru/imager-ci:2026.09.2
 ```
 
 ## Тестирование образа
@@ -94,7 +97,7 @@ docker run --rm -v "$PWD":/workspace -w /workspace imager-ci:test sh -c "
 1. Измените версии toolchain в `Dockerfile` (при необходимости).
 2. Соберите и протестируйте образ локально (см. выше).
 3. Опубликуйте в GitVerse Container Registry под новым immutable-тегом
-   (например, `2026.09.1` → `2026.10.1`). Не перезаписывайте существующие теги.
+   (например, `2026.09.2` → `2026.10.1`). Не перезаписывайте существующие теги.
 4. Обновите `image:` в `.gitverse/workflows/publish.yml` на новый тег.
 5. Запустите workflow на теге `v*` и убедитесь, что шаг
    `Check CI environment` показывает ожидаемые версии.
@@ -116,8 +119,12 @@ GitVerse по аутентификации runner в Container Registry).
 
 ## Текущий статус (2026-09-11)
 
-- Образ `gitverse.ru/pkg-ru/imager-ci:2026.09.1` **опубликован** в GitVerse
-  Container Registry (digest `sha256:5b0775fc68cce04a226d0ba9cddc4ad4f96738cebe71d88fd74a38f3d69a4e1e`).
+- Образ `gitverse.ru/pkg-ru/imager-ci:2026.09.2` **опубликован** в GitVerse
+  Container Registry.
+- Изменение относительно `2026.09.1`: добавлен системный `unzip` в финальный
+  слой — Composer теперь распаковывает dist-пакеты (`twig/twig`, `symfony/*`)
+  из zipball'ов GitHub API вместо `git clone` (шаг `Install PHP dependencies`
+  в пайплайне падал по таймауту 300 с на клоне Twig).
 - Образ **публичный** — pull без аутентификации работает (проверено).
-- Размер: **~975 MB** (после multi-stage оптимизации; лимит blob GitVerse
+- Размер: **~976 MB** (после multi-stage оптимизации; лимит blob GitVerse
   Registry соблюдён — push прошёл без ошибки 413).

@@ -46,7 +46,7 @@ jobs:
     # Тег фиксированный (immutable), не latest. Обновление образа —
     # отдельное контролируемое изменение (см. README в каталоге образа).
     container:
-      image: gitverse.ru/pkg-ru/imager-ci:2026.09.1
+      image: gitverse.ru/pkg-ru/imager-ci:2026.09.2
 
     steps:
       - name: Checkout

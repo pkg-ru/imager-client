@@ -21,7 +21,7 @@
 #
 # Сборка:
 #   docker build -f .gitverse/docker/imager-ci/Dockerfile \
-#     -t gitverse.ru/pkg-ru/imager-ci:2026.09.1 .
+#     -t gitverse.ru/pkg-ru/imager-ci:2026.09.2 .
 #
 # Публикация в GitVerse Container Registry (cloud runner без Docker daemon):
 #   сборка через Kaniko, push в gitverse.ru/pkg-ru/imager-ci:<version>.
@@ -40,7 +40,10 @@ FROM php:8.1-cli-bookworm AS php-builder
 #   ext-iconv — symfony/polyfill-mbstring (composer.lock, Twig 3.28);
 #               iconv УЖЕ встроен в php:8.1-cli-bookworm;
 #   ctype/mbstring — встроены в ядро PHP 8.1 (polyfill не нужен);
-#   xml/zip   — НЕ используются проектом, не устанавливаем.
+#   xml/zip   — PHP-расширения НЕ используются проектом, не устанавливаем.
+#               НО системный unzip нужен Composer: dist-источники пакетов
+#               (twig/twig, symfony/*) в composer.lock — zipball'ы с GitHub API,
+#               без unzip/7z Composer откатывается на git clone (таймаут 300 с).
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends libcurl4-openssl-dev; \
@@ -108,6 +111,9 @@ ARG COMPOSER_VERSION=2.9.1
 
 # --- Системные пакеты (runtime) -------------------------------------------- #
 # git, curl, ca-certificates — нужны pipeline (checkout, push, dispatch).
+# unzip — нужен Composer: dist-источники пакетов (twig/twig, symfony/*)
+# в composer.lock — zipball'ы с GitHub API; без unzip/7z Composer откатывается
+# на git clone (таймаут 300 с в пайплайне).
 # libcurl4 и прочие runtime-библиотеки — для PHP-расширений (curl, mbstring,
 # openssl, sqlite, sodium, argon2, readline, xml, zlib).
 # Единый apt-get install + очистка /var/lib/apt/lists/* и apt-кэша.
@@ -117,6 +123,7 @@ RUN set -eux; \
         ca-certificates \
         curl \
         git \
+        unzip \
         libcurl4 \
         libonig5 \
         libxml2 \
