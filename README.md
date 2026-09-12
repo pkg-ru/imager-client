@@ -42,6 +42,13 @@ dpr, форматы, srcset) — в ядре, компоненты нормал�
 (`src`→`source`, `preset`→`segment`, `width`/`height`→сегмент) и рендерят
 нативные узлы фреймворка.
 
+**SSR / prerender + hydration.** Плагины **не являются `.client`-only**:
+инстанс `Imager` нужен и на сервере (SSR/prerender формируют `<picture>`
+с `<source>` в HTML), и на клиенте (ts/vue/react — hydration). Ядро — чистые
+функции без DOM/`window`, поэтому один и тот же код даёт **идентичный HTML**
+на сервере и на клиенте. Примеры интеграции: [Next.js](./packages/react/README.md#ssr--prerender--hydration),
+[Nuxt 3](./packages/vue/README.md#ssr--prerender--hydration), SvelteKit.
+
 | Пакет | Экосистема | Компоненты | Документация |
 |---|---|---|---|
 | `@pkg-ru/imager-react` | npm, peer: react ≥17 | `ImagerPlugin`, `ImagerProvider`, `ImagerAssets`, `ImagerAsset` | [README](./packages/react/README.md) |

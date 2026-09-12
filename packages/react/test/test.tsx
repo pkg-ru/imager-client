@@ -129,6 +129,51 @@ check(
     ),
 );
 
+// 5b. ImagerAssets: decoding/fetchpriority → <img>
+check(
+    "assets decoding fetchpriority",
+    renderAssets({
+        src: "/test.png",
+        segment: "200x200",
+        formats: ["webp", "png"],
+        dpr: 2,
+        decoding: "async",
+        fetchpriority: "high",
+    }),
+    imager.GetAssetsHtml(
+        "/test.png",
+        "200x200",
+        ["webp", "png"],
+        2,
+        { decoding: "async", fetchpriority: "high" },
+    ),
+);
+
+// 5c. ImagerAssets: imgAttrs → <img> с приоритетом над перенаправленными
+check(
+    "assets imgAttrs priority",
+    renderAssets({
+        src: "/test.png",
+        segment: "200x200",
+        formats: ["webp", "png"],
+        dpr: 2,
+        alt: "Фото",
+        class: "wrap",
+        imgAttrs: { class: "img", decoding: "async", fetchpriority: "high", width: 333, height: 444 },
+    }),
+    imager.GetAssetsHtml(
+        "/test.png",
+        "200x200",
+        ["webp", "png"],
+        2,
+        {
+            alt: "Фото",
+            class: "wrap",
+            imgAttrs: { class: "img", decoding: "async", fetchpriority: "high", width: 333, height: 444 },
+        },
+    ),
+);
+
 // 6. ImagerPlugin.install: глобальная инициализация без ImagerProvider
 ImagerPlugin.install({ baseURL: "/test-png/", format: "webp", dpr: 2 });
 check(

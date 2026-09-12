@@ -23,6 +23,8 @@ export interface ImagerComponentProps {
     formats?: string | string[];
     dpr?: number | string;
     dprs?: number | string;
+    /** Атрибуты, попадающие именно на <img> (приоритет над перенаправленными). */
+    imgAttrs?: Record<string, unknown>;
     [attr: string]: unknown;
 }
 

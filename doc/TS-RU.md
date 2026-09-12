@@ -124,8 +124,10 @@ GetAssetPath(source: string, segment?: Segment, format?: string, dpr?: number | 
 |---|---|---|
 | `class`, `id`, `data-*`, прочие | `<picture>` | — |
 | `alt`, `sizes`, `loading` | `<img>` | — |
+| `decoding`, `fetchpriority` | `<img>` | нативные атрибуты `<img>` (async-декодирование, приоритет загрузки) |
 | `lazy` | `<img>` | булев: превращается в `loading="lazy"` |
 | `width`, `height` | `<img>` | перекрываются автоматическими значениями из базового path (для CLS) |
+| `imgAttrs` | `<img>` | объект атрибутов, попадающих именно на `<img>`; объединяется с перенаправленными атрибутами, **имеет приоритет** |
 
 Правила:
 
@@ -135,7 +137,8 @@ GetAssetPath(source: string, segment?: Segment, format?: string, dpr?: number | 
 - Внутри `<picture>` теги делятся по типу (формату): все пути одного формата объединяются в один `srcset`.
 - Для `<img>` выбирается группа: 1) формат исходника (`source_format: true`); 2) первый поддерживаемый всеми браузерами (`all_support: true`); 3) последняя. Остальные форматы — `<source type="...">`.
 - `srcset`-дескрипторы: если в `options` передан `sizes` — `w`-дескрипторы по ширине (`200w`, `400w`); иначе — `x`-дескрипторы по dpr (`1x`, `2x`, `3x`); если dpr нет, но есть высота — dpr вычисляется из отношения высот (дробные допустимы, напр. `1.5x`); размеры автоматически не генерируются.
-- `width`/`height` на `<img>` добавляются из базового (первого) path, если известны — для CLS.
+- `width`/`height` на `<img>` добавляются из базового (первого) path, если известны — для CLS. Если пользователь задал свои `width`/`height` (напрямую или через `imgAttrs`) — автоматические не добавляются (без дублирования).
+- `imgAttrs` объединяется с перенаправленными img-атрибутами (`alt`, `sizes`, `loading`, `width`, `height`, `decoding`, `fetchpriority`): значения из `imgAttrs` имеют приоритет. Сам ключ `imgAttrs` в `<picture>` не попадает.
 - Если ассетов нет — возвращается пустая строка.
 
 Пример:
@@ -154,6 +157,29 @@ const html = imager.GetAssetsHtml(
 <picture class="photo" id="main">
     <source type="image/webp" srcset="/test-png/200x200.webp 1x, /test-png/200x200@2.webp 2x">
     <img src="/test-png/200x200.png" srcset="/test-png/200x200.png 1x, /test-png/200x200@2.png 2x" alt="Hello & <world>" loading="lazy" width="200" height="200">
+</picture>
+```
+
+Пример с `imgAttrs` (атрибуты именно на `<img>`, приоритет над перенаправленными):
+
+```ts
+const html = imager.GetAssetsHtml(
+    "/test.png",
+    "200x200",
+    ["webp", "png"],
+    2,
+    {
+        class: "photo",
+        alt: "Фото",
+        imgAttrs: { class: "img", decoding: "async", fetchpriority: "high", width: 333, height: 444 },
+    },
+);
+```
+
+```html
+<picture class="photo">
+    <source type="image/webp" srcset="/test-png/200x200.webp 1x, /test-png/200x200@2.webp 2x">
+    <img src="/test-png/200x200.png" srcset="/test-png/200x200.png 1x, /test-png/200x200@2.png 2x" alt="Фото" class="img" decoding="async" fetchpriority="high" width="333" height="444">
 </picture>
 ```
 

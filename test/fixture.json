@@ -1185,5 +1185,79 @@
             "dprs": 0
         },
         "expected": "<picture>\n    <source type=\"image/webp\" src=\"/test-png/test-png/x.webp\">\n    <img src=\"/test-png/test-png/x.png\">\n</picture>"
+    },
+    {
+        "id": 51,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 2,
+            "options": {
+                "class": "photo",
+                "alt": "Фото",
+                "decoding": "async",
+                "fetchpriority": "high"
+            }
+        },
+        "expected": "<picture class=\"photo\">\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Фото\" decoding=\"async\" fetchpriority=\"high\" width=\"200\" height=\"200\">\n</picture>"
+    },
+    {
+        "id": 52,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 2,
+            "options": {
+                "class": "photo",
+                "alt": "Фото",
+                "imgAttrs": {
+                    "class": "img",
+                    "decoding": "async",
+                    "fetchpriority": "high",
+                    "width": 333,
+                    "height": 444
+                }
+            }
+        },
+        "expected": "<picture class=\"photo\">\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Фото\" class=\"img\" decoding=\"async\" fetchpriority=\"high\" height=\"444\" width=\"333\">\n</picture>"
+    },
+    {
+        "id": 53,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "200x200",
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 2,
+            "options": {
+                "alt": "Фото",
+                "imgAttrs": {
+                    "alt": "Приоритет"
+                }
+            }
+        },
+        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Приоритет\" width=\"200\" height=\"200\">\n</picture>"
     }
 ]

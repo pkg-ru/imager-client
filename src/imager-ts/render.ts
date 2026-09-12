@@ -13,6 +13,8 @@ export const IMG_ATTRS: Record<string, boolean> = {
     loading: true,
     width: true,
     height: true,
+    decoding: true,
+    fetchpriority: true,
 };
 
 /** Число → строка дескриптора: 1 → "1", 1.5 → "1.5" (без хвостовых нулей). */
@@ -112,7 +114,13 @@ export function pickImgGroup(groups: HtmlGroup[]): number {
     return imgIndex;
 }
 
-/** Разделение атрибутов: img-атрибуты vs атрибуты <picture>. */
+/** Разделение атрибутов: img-атрибуты vs атрибуты <picture>.
+
+`imgAttrs` в options — объект атрибутов, которые попадают именно на <img>.
+Он объединяется с перенаправленными img-атрибутами (alt, sizes, loading,
+width, height, decoding, fetchpriority), при этом `imgAttrs` имеет приоритет.
+Сам ключ `imgAttrs` в <picture> не попадает.
+*/
 export function splitAttrs(
     options: Record<string, unknown>,
 ): { imgAttrs: Record<string, unknown>; picAttrs: Record<string, unknown> } {
@@ -124,6 +132,15 @@ export function splitAttrs(
     }
     delete imgOpts["lazy"];
 
+    // явные img-атрибуты (приоритет над перенаправленными)
+    const explicit: Record<string, unknown> =
+        imgOpts["imgAttrs"] !== null &&
+        imgOpts["imgAttrs"] !== undefined &&
+        typeof imgOpts["imgAttrs"] === "object"
+            ? (imgOpts["imgAttrs"] as Record<string, unknown>)
+            : {};
+    delete imgOpts["imgAttrs"];
+
     const imgAttrs: Record<string, unknown> = {};
     const picAttrs: Record<string, unknown> = {};
     for (const key of Object.keys(imgOpts)) {
@@ -132,6 +149,10 @@ export function splitAttrs(
         } else {
             picAttrs[key] = imgOpts[key];
         }
+    }
+    // merge: перенаправленные + явные (явные имеют приоритет)
+    for (const key of Object.keys(explicit)) {
+        imgAttrs[key] = explicit[key];
     }
     return { imgAttrs, picAttrs };
 }

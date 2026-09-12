@@ -393,7 +393,7 @@ final class Imager
     // ------------------------------------------------------------------ //
 
     /** @var array<int, string> атрибуты, относящиеся к <img>, а не к <picture> */
-    private const IMG_ATTRS = ['alt', 'sizes', 'loading', 'width', 'height'];
+    private const IMG_ATTRS = ['alt', 'sizes', 'loading', 'width', 'height', 'decoding', 'fetchpriority'];
 
     /**
      * Экранирование значения HTML-атрибута.
@@ -505,6 +505,10 @@ final class Imager
         }
         unset($options['lazy']);
 
+        // явные img-атрибуты (приоритет над перенаправленными)
+        $explicit = is_array($options['imgAttrs'] ?? null) ? $options['imgAttrs'] : [];
+        unset($options['imgAttrs']);
+
         // Разделение атрибутов: img-атрибуты vs атрибуты <picture>
         // (ksort в renderAttrs — детерминированный порядок вывода)
         $imgAttrs = [];
@@ -515,6 +519,10 @@ final class Imager
             } else {
                 $picAttrs[$key] = $value;
             }
+        }
+        // merge: перенаправленные + явные (явные имеют приоритет)
+        foreach ($explicit as $key => $value) {
+            $imgAttrs[$key] = $value;
         }
 
         // Группировка по типу (формату): пути всех сегментов одного формата
@@ -583,10 +591,12 @@ final class Imager
                 $img .= ' ' . $name . '="' . self::htmlEscape($value) . '"';
             }
         }
-        if ($base->width !== null && $base->width > 0) {
+        // width/height для CLS из базового path — только если пользователь
+        // не задал свои (напрямую или через imgAttrs): без дублирования.
+        if ($base->width !== null && $base->width > 0 && !isset($imgAttrs['width'])) {
             $img .= ' width="' . $base->width . '"';
         }
-        if ($base->height !== null && $base->height > 0) {
+        if ($base->height !== null && $base->height > 0 && !isset($imgAttrs['height'])) {
             $img .= ' height="' . $base->height . '"';
         }
         $imgHtml = '<img' . $img . '>';

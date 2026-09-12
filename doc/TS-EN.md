@@ -124,8 +124,10 @@ Returns a **string** — HTML markup `<picture>`/`<img>` for the same Cartesian 
 |---|---|---|
 | `class`, `id`, `data-*`, others | `<picture>` | — |
 | `alt`, `sizes`, `loading` | `<img>` | — |
+| `decoding`, `fetchpriority` | `<img>` | native `<img>` attributes (async decoding, fetch priority) |
 | `lazy` | `<img>` | boolean: becomes `loading="lazy"` |
 | `width`, `height` | `<img>` | overridden by automatic values from the base path (for CLS) |
+| `imgAttrs` | `<img>` | object of attributes placed exactly on `<img>`; merged with forwarded attributes, **has priority** |
 
 Rules:
 
@@ -135,7 +137,8 @@ Rules:
 - Inside `<picture>` tags are divided by type (format): all paths of one format are merged into a single `srcset`.
 - For `<img>` the group is chosen: 1) source format (`source_format: true`); 2) first universally supported (`all_support: true`); 3) the last one. The remaining formats become `<source type="...">`.
 - `srcset` descriptors: if `sizes` is passed in `options` — `w`-descriptors by width (`200w`, `400w`); otherwise — `x`-descriptors by dpr (`1x`, `2x`, `3x`); if there is no dpr but height exists — dpr is computed from the height ratio (fractional allowed, e.g. `1.5x`); sizes are never auto-generated.
-- `width`/`height` on `<img>` are added from the base (first) path when known — for CLS.
+- `width`/`height` on `<img>` are added from the base (first) path when known — for CLS. If the user provided their own `width`/`height` (directly or via `imgAttrs`) — automatic ones are not added (no duplication).
+- `imgAttrs` is merged with forwarded img attributes (`alt`, `sizes`, `loading`, `width`, `height`, `decoding`, `fetchpriority`): values from `imgAttrs` take priority. The `imgAttrs` key itself never lands on `<picture>`.
 - If there are no assets — an empty string is returned.
 
 Example:
@@ -154,6 +157,29 @@ const html = imager.GetAssetsHtml(
 <picture class="photo" id="main">
     <source type="image/webp" srcset="/test-png/200x200.webp 1x, /test-png/200x200@2.webp 2x">
     <img src="/test-png/200x200.png" srcset="/test-png/200x200.png 1x, /test-png/200x200@2.png 2x" alt="Hello & <world>" loading="lazy" width="200" height="200">
+</picture>
+```
+
+Example with `imgAttrs` (attributes placed exactly on `<img>`, priority over forwarded):
+
+```ts
+const html = imager.GetAssetsHtml(
+    "/test.png",
+    "200x200",
+    ["webp", "png"],
+    2,
+    {
+        class: "photo",
+        alt: "Photo",
+        imgAttrs: { class: "img", decoding: "async", fetchpriority: "high", width: 333, height: 444 },
+    },
+);
+```
+
+```html
+<picture class="photo">
+    <source type="image/webp" srcset="/test-png/200x200.webp 1x, /test-png/200x200@2.webp 2x">
+    <img src="/test-png/200x200.png" srcset="/test-png/200x200.png 1x, /test-png/200x200@2.png 2x" alt="Photo" class="img" decoding="async" fetchpriority="high" width="333" height="444">
 </picture>
 ```
 

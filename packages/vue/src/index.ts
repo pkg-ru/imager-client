@@ -105,10 +105,20 @@ function imgAttrs(
     if (paths.length > 1) {
         attrs.srcset = buildSrcset(paths, useWidth);
     }
-    if (base.width !== undefined && base.width > 0) {
+    // width/height для CLS из базового path — только если пользователь
+    // не задал свои (напрямую или через imgAttrs): без дублирования.
+    if (
+        base.width !== undefined &&
+        base.width > 0 &&
+        (extra["width"] === undefined || extra["width"] === null)
+    ) {
         attrs.width = base.width;
     }
-    if (base.height !== undefined && base.height > 0) {
+    if (
+        base.height !== undefined &&
+        base.height > 0 &&
+        (extra["height"] === undefined || extra["height"] === null)
+    ) {
         attrs.height = base.height;
     }
     return attrs;
@@ -136,16 +146,31 @@ const baseProps = {
     sizes: { type: String, default: undefined },
     loading: { type: String, default: undefined },
     lazy: { type: Boolean, default: undefined },
+    decoding: { type: String, default: undefined },
+    fetchpriority: { type: String, default: undefined },
+    // явные img-атрибуты (приоритет над перенаправленными)
+    imgAttrs: { type: Object as PropType<Record<string, unknown> | undefined>, default: undefined },
     // picture-атрибуты
     class: { type: String, default: undefined },
     id: { type: String, default: undefined },
     style: { type: [String, Object], default: undefined },
 };
 
-/** Собирает HTML-атрибуты из props (alt, sizes, loading, lazy, class, id, style). */
+/** Собирает HTML-атрибуты из props (alt, sizes, loading, lazy, decoding, fetchpriority, imgAttrs, class, id, style). */
 function htmlAttrsFromProps(props: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    for (const key of ["alt", "sizes", "loading", "lazy", "class", "id", "style"]) {
+    for (const key of [
+        "alt",
+        "sizes",
+        "loading",
+        "lazy",
+        "decoding",
+        "fetchpriority",
+        "imgAttrs",
+        "class",
+        "id",
+        "style",
+    ]) {
         if (props[key] !== undefined && props[key] !== null) {
             out[key] = props[key];
         }

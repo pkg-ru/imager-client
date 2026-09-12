@@ -92,6 +92,63 @@ export function App() {
 
 
 
+## SSR / prerender + hydration
+
+Плагин **не является `.client`-only**: инстанс `Imager` нужен и на сервере
+(SSR/prerender формируют `<picture>` с `<source>` в HTML), и на клиенте
+(ts/vue/react — hydration). Компоненты рендерят **нативные React-узлы**
+(без `dangerouslySetInnerHTML`), а ядро — чистые функции без DOM/`window`,
+поэтому один и тот же код даёт **идентичный HTML** на сервере и на клиенте.
+
+### Next.js (App Router)
+
+```tsx
+// app/layout.tsx — серверный рендер
+import { ImagerPlugin, ImagerAssets } from "@pkg-ru/imager-react";
+
+ImagerPlugin.install({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2 });
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <html lang="ru">
+            <body>
+                <ImagerAssets src="/test.png" width={200} height={200} dpr={2} format="webp" alt="Фото" />
+                {children}
+            </body>
+        </html>
+    );
+}
+```
+
+`ImagerPlugin.install` вызывается один раз при старте приложения — на сервере
+он выполняется в процессе SSR, на клиенте — при инициализации модуля.
+`ImagerProvider` с `options`/`imager` работает аналогично в обоих окружениях.
+
+### SvelteKit
+
+```ts
+// src/lib/server/imager.ts — серверная инициализация
+import { Imager } from "@pkg-ru/imager-react";
+export const imager = new Imager({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2 });
+```
+
+```svelte
+<!-- src/routes/+page.svelte — рендер на сервере и hydration на клиенте -->
+<script>
+    import { ImagerProvider, ImagerAssets } from "@pkg-ru/imager-react";
+    import { imager } from "$lib/server/imager";
+</script>
+
+<ImagerProvider {imager}>
+    <ImagerAssets src="/test.png" width={200} height={200} dpr={2} format="webp" alt="Фото" />
+</ImagerProvider>
+```
+
+> В SvelteKit серверный импорт (`$lib/server`) не попадает в клиентский бандл —
+> на клиенте `ImagerProvider` создаёт свой инстанс из тех же `options`.
+
+
+
 ## Re-export ядра
 
 Пакет re-export'ит ядро: `Imager`, `ImagerOptions`, `AssetPath`, `AssetType`, `Segment`,
@@ -122,7 +179,27 @@ export function App() {
 
 
 
-HTML-атрибуты: `alt`, `sizes`, `loading`/`lazy` → `<img>`; `class`, `id`, `style` → `<picture>`.
+HTML-атрибуты: `alt`, `sizes`, `loading`/`lazy`, `decoding`, `fetchpriority` → `<img>`;
+`class`, `id`, `style` → `<picture>`.
+
+`imgAttrs` — объект атрибутов, попадающих **именно на `<img>`** (приоритет над
+перенаправленными атрибутами):
+
+```tsx
+<ImagerAssets
+    src="/test.png"
+    class="wrap"
+    alt="Фото"
+    imgAttrs={{ class: "img", decoding: "async", fetchpriority: "high", width: 333, height: 444 }}
+/>
+```
+
+```html
+<picture class="wrap">
+    <source type="image/webp" srcset="...">
+    <img src="..." srcset="..." alt="Фото" class="img" decoding="async" fetchpriority="high" width="333" height="444">
+</picture>
+```
 
 
 

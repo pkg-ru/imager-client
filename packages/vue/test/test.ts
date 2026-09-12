@@ -126,6 +126,51 @@ check(
     () => expected5,
 );
 
+const expected6 = imager.GetAssetsHtml(
+    "/test.png",
+    "200x200",
+    ["webp", "png"],
+    2,
+    { decoding: "async", fetchpriority: "high" },
+);
+check(
+    "assets decoding fetchpriority",
+    renderAssets({
+        src: "/test.png",
+        segment: "200x200",
+        formats: ["webp", "png"],
+        dpr: 2,
+        decoding: "async",
+        fetchpriority: "high",
+    }),
+    () => expected6,
+);
+
+const expected7 = imager.GetAssetsHtml(
+    "/test.png",
+    "200x200",
+    ["webp", "png"],
+    2,
+    {
+        alt: "Фото",
+        class: "wrap",
+        imgAttrs: { class: "img", decoding: "async", fetchpriority: "high", width: 333, height: 444 },
+    },
+);
+check(
+    "assets imgAttrs priority",
+    renderAssets({
+        src: "/test.png",
+        segment: "200x200",
+        formats: ["webp", "png"],
+        dpr: 2,
+        alt: "Фото",
+        class: "wrap",
+        imgAttrs: { class: "img", decoding: "async", fetchpriority: "high", width: 333, height: 444 },
+    }),
+    () => expected7,
+);
+
 console.log("---");
 console.log(`vue: ${total} cases, ${total - failed} passed, ${failed} failed`);
 if (failed > 0) {

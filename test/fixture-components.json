@@ -146,5 +146,45 @@
             "dprs": null,
             "options": {}
         }
+    },
+    {
+        "id": 8,
+        "method": "NormalizeProps",
+        "args": {
+            "props": {
+                "src": "/e.webp",
+                "width": 200,
+                "height": 200,
+                "dpr": 2,
+                "format": "webp",
+                "alt": "Фото",
+                "decoding": "async",
+                "fetchpriority": "high",
+                "imgAttrs": {
+                    "class": "img",
+                    "width": 333
+                },
+                "class": "wrap"
+            }
+        },
+        "expected": {
+            "source": "/e.webp",
+            "segments": {
+                "width": 200,
+                "height": 200
+            },
+            "formats": "webp",
+            "dprs": 2,
+            "options": {
+                "alt": "Фото",
+                "decoding": "async",
+                "fetchpriority": "high",
+                "imgAttrs": {
+                    "class": "img",
+                    "width": 333
+                },
+                "class": "wrap"
+            }
+        }
     }
 ]

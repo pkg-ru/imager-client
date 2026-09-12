@@ -665,10 +665,20 @@ export class Imager {
                 img += " " + name + '="' + Imager._htmlEscape(value) + '"';
             }
         }
-        if (base.width !== undefined && base.width > 0) {
+        // width/height для CLS из базового path — только если пользователь
+        // не задал свои (напрямую или через imgAttrs): без дублирования.
+        if (
+            base.width !== undefined &&
+            base.width > 0 &&
+            (imgAttrs["width"] === undefined || imgAttrs["width"] === null)
+        ) {
             img += ' width="' + base.width + '"';
         }
-        if (base.height !== undefined && base.height > 0) {
+        if (
+            base.height !== undefined &&
+            base.height > 0 &&
+            (imgAttrs["height"] === undefined || imgAttrs["height"] === null)
+        ) {
             img += ' height="' + base.height + '"';
         }
         const imgHtml = "<img" + img + ">";

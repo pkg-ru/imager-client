@@ -485,7 +485,9 @@ class Imager:
     # ------------------------------------------------------------------ #
 
     #: атрибуты, относящиеся к <img>, а не к <picture>
-    _IMG_ATTRS = frozenset(("alt", "sizes", "loading", "width", "height"))
+    _IMG_ATTRS = frozenset(
+        ("alt", "sizes", "loading", "width", "height", "decoding", "fetchpriority")
+    )
 
     @staticmethod
     def _html_escape(value: str) -> str:
@@ -578,6 +580,12 @@ class Imager:
             img_opts["loading"] = img_opts.get("loading") or "lazy"
         img_opts.pop("lazy", None)
 
+        # явные img-атрибуты (приоритет над перенаправленными)
+        explicit = img_opts.get("imgAttrs")
+        if not isinstance(explicit, dict):
+            explicit = {}
+        img_opts.pop("imgAttrs", None)
+
         # Разделение атрибутов: img-атрибуты vs атрибуты <picture>
         # (сортировка по имени — детерминированный порядок вывода)
         img_attrs = []
@@ -587,6 +595,10 @@ class Imager:
                 img_attrs.append((key, value))
             else:
                 pic_attrs.append((key, value))
+        # merge: перенаправленные + явные (явные имеют приоритет)
+        for key, value in sorted(explicit.items()):
+            img_attrs = [(k, v) for k, v in img_attrs if k != key]
+            img_attrs.append((key, value))
 
         # Группировка по типу (формату): пути всех сегментов одного формата
         # объединяются в один srcset внутри одного <source>/<img>.
@@ -645,10 +657,12 @@ class Imager:
                 img_attr_chunks.append(
                     " " + name + '="' + self._html_escape(str(value)) + '"'
                 )
-        # width/height для CLS из базового path
-        if base.get("width"):
+        # width/height для CLS из базового path — только если пользователь
+        # не задал свои (напрямую или через imgAttrs): без дублирования.
+        img_attr_names = {name for name, _ in img_attrs}
+        if base.get("width") and "width" not in img_attr_names:
             img_attr_chunks.append(' width="' + str(base["width"]) + '"')
-        if base.get("height"):
+        if base.get("height") and "height" not in img_attr_names:
             img_attr_chunks.append(' height="' + str(base["height"]) + '"')
 
         img_html = "<img" + "".join(img_attr_chunks) + ">"

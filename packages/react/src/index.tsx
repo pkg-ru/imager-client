@@ -128,10 +128,20 @@ function buildImg(
     if (paths.length > 1) {
         attrs.srcSet = buildSrcset(paths, useWidth);
     }
-    if (base.width !== undefined && base.width > 0) {
+    // width/height для CLS из базового path — только если пользователь
+    // не задал свои (напрямую или через imgAttrs): без дублирования.
+    if (
+        base.width !== undefined &&
+        base.width > 0 &&
+        (imgAttrs["width"] === undefined || imgAttrs["width"] === null)
+    ) {
         attrs.width = base.width;
     }
-    if (base.height !== undefined && base.height > 0) {
+    if (
+        base.height !== undefined &&
+        base.height > 0 &&
+        (imgAttrs["height"] === undefined || imgAttrs["height"] === null)
+    ) {
         attrs.height = base.height;
     }
     return React.createElement("img", attrs);

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"sort"
 	"strconv"
@@ -83,8 +84,8 @@ func New(options ...Options) *Imager {
 		// adminURL — без завершающего `/`
 		if o.AdminURL == "" {
 			i.AdminURL = ""
-		} else if strings.HasSuffix(o.AdminURL, "/") {
-			i.AdminURL = strings.TrimSuffix(o.AdminURL, "/")
+		} else if before, ok := strings.CutSuffix(o.AdminURL, "/"); ok {
+			i.AdminURL = before
 		} else {
 			i.AdminURL = o.AdminURL
 		}
@@ -154,12 +155,12 @@ func isDigits(s string) bool {
 // Семантика сохранена: "200x200" → (true,200,200), "200x" → (true,200,0),
 // "x200" → (true,0,200), "x" → (true,0,0), без "x" → (false,0,0).
 func parseSizeString(segment string) (bool, int, int) {
-	idx := strings.Index(segment, "x")
-	if idx < 0 {
+	before, after, ok := strings.Cut(segment, "x")
+	if !ok {
 		return false, 0, 0
 	}
-	left := segment[0:idx]
-	right := segment[idx+1:]
+	left := before
+	right := after
 	if (left == "" || isDigits(left)) && (right == "" || isDigits(right)) {
 		width := 0
 		height := 0
@@ -419,7 +420,7 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 	pidx := 0
 	for _, seg := range segList {
 		segStr, isSize, width, height := normalizeSegment(seg)
-		for fi := 0; fi < nFmt; fi++ {
+		for fi := range nFmt {
 			eff := fmtList[fi]
 			if eff == "" {
 				eff = sourceFormat
@@ -558,6 +559,7 @@ func buildSrcset(paths []AssetPath, useWidth bool) string {
 // Атрибуты, относящиеся к <img>, а не к <picture>.
 var imgAttrsSet = map[string]bool{
 	"alt": true, "sizes": true, "loading": true, "width": true, "height": true,
+	"decoding": true, "fetchpriority": true,
 }
 
 // Рендер атрибутов: true → имя без значения, false → пропуск, иначе "name=\"value\"".
@@ -606,15 +608,23 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 
 	// lazy → loading="lazy"
 	imgOpts := make(map[string]any, len(options))
-	for k, v := range options {
-		imgOpts[k] = v
-	}
+	maps.Copy(imgOpts, options)
 	if lazy, ok := imgOpts["lazy"]; ok && truthy(lazy) {
 		if _, has := imgOpts["loading"]; !has || imgOpts["loading"] == nil {
 			imgOpts["loading"] = "lazy"
 		}
 	}
 	delete(imgOpts, "lazy")
+
+	// явные img-атрибуты (приоритет над перенаправленными)
+	explicit := make(map[string]any, 0)
+	if v, ok := imgOpts["imgAttrs"]; ok && v != nil {
+		switch t := v.(type) {
+		case map[string]any:
+			maps.Copy(explicit, t)
+		}
+	}
+	delete(imgOpts, "imgAttrs")
 
 	// Разделение атрибутов: img-атрибуты vs атрибуты <picture>
 	// (сортировка по имени — детерминированный порядок вывода)
@@ -632,6 +642,25 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 			picAttrs = append(picAttrs, [2]any{k, v})
 		}
 	}
+	// merge: перенаправленные + явные (явные имеют приоритет)
+	for k, v := range explicit {
+		// удалить существующий ключ (если есть), затем добавить явный
+		var merged [][2]any
+		for _, kv := range imgAttrs {
+			name, _ := kv[0].(string)
+			if name != k {
+				merged = append(merged, kv)
+			}
+		}
+		merged = append(merged, [2]any{k, v})
+		imgAttrs = merged
+	}
+	// сортировка по имени — детерминированный порядок вывода (как в TS/Py/PHP)
+	sort.Slice(imgAttrs, func(a, b int) bool {
+		na, _ := imgAttrs[a][0].(string)
+		nb, _ := imgAttrs[b][0].(string)
+		return na < nb
+	})
 
 	// Группировка по типу (формату): пути всех сегментов одного формата
 	// объединяются в один srcset внутри одного <source>/<img>.
@@ -696,10 +725,22 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 			img.WriteString(" " + name + `="` + htmlEscape(fmt.Sprintf("%v", v)) + `"`)
 		}
 	}
-	if base.Width > 0 {
+	// width/height для CLS из базового path — только если пользователь
+	// не задал свои (напрямую или через imgAttrs): без дублирования.
+	hasWidth, hasHeight := false, false
+	for _, kv := range imgAttrs {
+		name, _ := kv[0].(string)
+		if name == "width" {
+			hasWidth = true
+		}
+		if name == "height" {
+			hasHeight = true
+		}
+	}
+	if base.Width > 0 && !hasWidth {
 		img.WriteString(` width="` + strconv.Itoa(base.Width) + `"`)
 	}
-	if base.Height > 0 {
+	if base.Height > 0 && !hasHeight {
 		img.WriteString(` height="` + strconv.Itoa(base.Height) + `"`)
 	}
 	imgHTML := "<img" + img.String() + ">"
