@@ -72,7 +72,7 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) []AssetType
 ```
 
-Возвращает **список** `AssetType` — декартово произведение `segments × formats` (внешний цикл — segments). `segments` не задан → `["x"]`. `formats` не задан → настройки `Formats` → `[Format]` → `[формат исходника]`.
+Возвращает **список** `AssetType` — по одному на каждый формат (все ассеты с одинаковым типом объединяются в один `AssetType`). Внутри `Paths` порядок **сегмент-мажорный**: для каждого сегмента все dpr-шаги подряд. `Dpr` каждого пути пересчитывается из фактических размеров: база — ширина (или высота) первого участника с известным размером, `dpr = фактическая ширина / базовая ширина`. `segments` не задан → `["x"]`. `formats` не задан → настройки `Formats` → `[Format]` → `[формат исходника]`.
 
 ### GetAssetsHtml
 
@@ -80,7 +80,7 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs any, options map[string]any) string
 ```
 
-Возвращает **строку** — HTML-разметку `<picture>`/`<img>` по тому же декартову произведению `segments × formats`, что и `GetAssets`. Один вызов генерирует ровно один тег `<picture>` (или `<img>`, если формат один).
+Возвращает **строку** — HTML-разметку `<picture>`/`<img>` по тем же ассетам, что и `GetAssets` (ассеты группируются по типу). Один вызов генерирует ровно один тег `<picture>` (или `<img>`, если формат один).
 
 `options` — HTML-атрибуты:
 
@@ -267,7 +267,7 @@ i.GetAsset("/test.gif", [2]int{200, 200})          // массив [width, heigh
 i.GetAsset("/test.gif", "200x200", "webp", nil)    // + формат
 i.GetAsset("/test.gif", "200x200", "webp", 2)      // + dpr
 i.GetAsset("/test.gif", "200x200", "webp", "2")    // dpr строкой
-i.GetAssets("/test.gif", []any{"200x200", "x400"}, []any{"webp", "gif"}, 2)  // 4 ассета
+i.GetAssets("/test.gif", []any{"200x200", "x400"}, []any{"webp", "gif"}, 2)  // 2 ассета (по одному на формат)
 ```
 
 ## Примеры
@@ -286,9 +286,9 @@ asset := i.GetAsset("/test.gif", imager.Size{Width: 200, Height: 200}, "gif", 2)
 // asset.Paths == [AssetPath{Path: '.../200x200.gif', Width: 200, Height: 200},
 //                 AssetPath{Path: '.../200x200@2.gif', Width: 400, Height: 400, Dpr: 2}]
 
-// Список ассетов (декартово произведение)
+// Список ассетов (по одному AssetType на формат)
 assets := i.GetAssets("/test.gif", []any{imager.Size{Width: 200, Height: 200}, imager.Size{Height: 400}}, []string{"webp", "gif"}, 1)
-// len(assets) == 4
+// len(assets) == 2
 
 // Только URL основного варианта
 url := i.GetAssetPath("/test.gif", "200x200", "webp")

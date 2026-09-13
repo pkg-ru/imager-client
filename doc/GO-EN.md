@@ -72,7 +72,7 @@ Returns a **single** `AssetType`. `Paths` contains all dpr variants from 1 to th
 func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) []AssetType
 ```
 
-Returns a **list** of `AssetType` — Cartesian product of `segments × formats` (outer loop — segments). `segments` not set → `["x"]`. `formats` not set → `Formats` option → `[Format]` → `[source format]`.
+Returns a **list** of `AssetType` — one per format (all assets with the same type are merged into a single `AssetType`). Inside `Paths` the order is **segment-major**: for each segment all dpr steps in a row. The `Dpr` of each path is recalculated from actual sizes: the base is the width (or height) of the first participant with a known size, `dpr = actual width / base width`. `segments` not set → `["x"]`. `formats` not set → `Formats` option → `[Format]` → `[source format]`.
 
 ### GetAssetsHtml
 
@@ -80,7 +80,7 @@ Returns a **list** of `AssetType` — Cartesian product of `segments × formats`
 func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs any, options map[string]any) string
 ```
 
-Returns a **string** — HTML markup `<picture>`/`<img>` for the same Cartesian product `segments × formats` as `GetAssets`. A single call generates exactly one `<picture>` tag (or `<img>` if there is only one format).
+Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as `GetAssets` (assets are grouped by type). A single call generates exactly one `<picture>` tag (or `<img>` if there is only one format).
 
 `options` — HTML attributes:
 
@@ -267,7 +267,7 @@ i.GetAsset("/test.gif", [2]int{200, 200})          // array [width, height] → 
 i.GetAsset("/test.gif", "200x200", "webp", nil)    // + format
 i.GetAsset("/test.gif", "200x200", "webp", 2)      // + dpr
 i.GetAsset("/test.gif", "200x200", "webp", "2")    // dpr as a string
-i.GetAssets("/test.gif", []any{"200x200", "x400"}, []any{"webp", "gif"}, 2)  // 4 assets
+i.GetAssets("/test.gif", []any{"200x200", "x400"}, []any{"webp", "gif"}, 2)  // 2 assets (one per format)
 ```
 
 ## Examples
@@ -286,9 +286,9 @@ asset := i.GetAsset("/test.gif", imager.Size{Width: 200, Height: 200}, "gif", 2)
 // asset.Paths == [AssetPath{Path: '.../200x200.gif', Width: 200, Height: 200},
 //                 AssetPath{Path: '.../200x200@2.gif', Width: 400, Height: 400, Dpr: 2}]
 
-// Asset list (Cartesian product)
+// Asset list (one AssetType per format)
 assets := i.GetAssets("/test.gif", []any{imager.Size{Width: 200, Height: 200}, imager.Size{Height: 400}}, []string{"webp", "gif"}, 1)
-// len(assets) == 4
+// len(assets) == 2
 
 // Primary variant URL only
 url := i.GetAssetPath("/test.gif", "200x200", "webp")

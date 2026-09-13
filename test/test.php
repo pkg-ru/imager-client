@@ -59,7 +59,12 @@ function assetPathToArray(AssetPath $path): array
 {
     $out = ['path' => $path->path];
     if ($path->dpr !== null) {
-        $out['dpr'] = $path->dpr;
+        // целый float → int (для единой JSON-сериализации с TS/Python/Go)
+        $dpr = $path->dpr;
+        if (is_float($dpr) && $dpr == (int)$dpr) {
+            $dpr = (int)$dpr;
+        }
+        $out['dpr'] = $dpr;
     }
     if ($path->width !== null) {
         $out['width'] = $path->width;

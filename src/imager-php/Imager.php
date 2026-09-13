@@ -338,7 +338,11 @@ final class Imager
         // 2. Суффиксы dpr: [без суффикса, @2, @3] — константы.
         $maxSteps = $dprVal == 2 ? 2 : ($dprVal >= 3 ? 3 : 1);
 
-        $result = [];
+        // Пути всех сегментов по каждому формату (сегмент-мажорно).
+        $pathsByFmt = [];
+        foreach ($fmtList as $fmt) {
+            $pathsByFmt[] = [];
+        }
         foreach ($segList as $seg) {
             [$segStr, $isSize, $width, $height] = self::normalizeSegment($seg);
             // Базы URL для шагов 1..3: {prefix}{segStr}[@2|@3]. — один раз на segment.
@@ -347,10 +351,8 @@ final class Imager
                 $prefix . $segStr . "@2.",
                 $prefix . $segStr . "@3.",
             ];
-            foreach ($fmtList as $fmt) {
+            foreach ($fmtList as $fi => $fmt) {
                 $effectiveFmt = $fmt !== "" ? $fmt : $sourceFormat;
-
-                $paths = [];
                 for ($step = 1; $step <= $maxSteps; $step++) {
                     $url = $bases[$step - 1] . $effectiveFmt;
 
@@ -369,20 +371,49 @@ final class Imager
                         $multiply = $step >= 2 ? $step : 1;
                         $item->height = $height * $multiply;
                     }
-                    $paths[] = $item;
+                    $pathsByFmt[$fi][] = $item;
                 }
-
-                $asset = new AssetType();
-                $asset->type = mime_for($effectiveFmt);
-                $asset->paths = $paths;
-                if ($effectiveFmt === $sourceFormat) {
-                    $asset->source_format = true;
-                }
-                if ($effectiveFmt === 'jpg' || $effectiveFmt === 'jpeg' || $effectiveFmt === 'gif' || $effectiveFmt === 'png') {
-                    $asset->all_support = true;
-                }
-                $result[] = $asset;
             }
+        }
+
+        // dpr из фактических размеров: базовая ширина = ширина первого
+        // участника с известной шириной; dpr = фактическая ширина / базовая.
+        // Если ширины нет — по высоте; если ни того, ни другого — без dpr.
+        // Целый результат → int (для единой JSON-сериализации с TS).
+        $result = [];
+        foreach ($fmtList as $fi => $fmt) {
+            $effectiveFmt = $fmt !== "" ? $fmt : $sourceFormat;
+            $paths = $pathsByFmt[$fi];
+            $baseWidth = 0;
+            $baseHeight = 0;
+            foreach ($paths as $item) {
+                if ($baseWidth === 0 && $item->width !== null && $item->width > 0) {
+                    $baseWidth = $item->width;
+                }
+                if ($baseHeight === 0 && $item->height !== null && $item->height > 0) {
+                    $baseHeight = $item->height;
+                }
+            }
+            foreach ($paths as $item) {
+                if ($baseWidth > 0 && $item->width !== null && $item->width > 0) {
+                    $dpr = $item->width / $baseWidth;
+                    $item->dpr = $dpr == (int)$dpr ? (int)$dpr : $dpr;
+                } elseif ($baseHeight > 0 && $item->height !== null && $item->height > 0) {
+                    $dpr = $item->height / $baseHeight;
+                    $item->dpr = $dpr == (int)$dpr ? (int)$dpr : $dpr;
+                }
+            }
+
+            $asset = new AssetType();
+            $asset->type = mime_for($effectiveFmt);
+            $asset->paths = $paths;
+            if ($effectiveFmt === $sourceFormat) {
+                $asset->source_format = true;
+            }
+            if ($effectiveFmt === 'jpg' || $effectiveFmt === 'jpeg' || $effectiveFmt === 'gif' || $effectiveFmt === 'png') {
+                $asset->all_support = true;
+            }
+            $result[] = $asset;
         }
 
         return $result;

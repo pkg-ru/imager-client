@@ -95,7 +95,7 @@ public function GetAssets(
 ): array;                     // AssetType[]
 ```
 
-Возвращает **список** `AssetType` — декартово произведение `segments × formats` (внешний цикл — segments). `segments` не задан → `["x"]`. `formats` не задан → настройки `formats` → `[format]` → `[формат исходника]`.
+Возвращает **список** `AssetType` — по одному на каждый формат (все ассеты с одинаковым типом объединяются в один `AssetType`). Внутри `paths` порядок **сегмент-мажорный**: для каждого сегмента все dpr-шаги подряд. `dpr` каждого пути пересчитывается из фактических размеров: база — ширина (или высота) первого участника с известным размером, `dpr = фактическая ширина / базовая ширина`. `segments` не задан → `["x"]`. `formats` не задан → настройки `formats` → `[format]` → `[формат исходника]`.
 
 ### GetAssetsHtml
 
@@ -109,7 +109,7 @@ public function GetAssetsHtml(
 ): string;
 ```
 
-Возвращает **строку** — HTML-разметку `<picture>`/`<img>` по тому же декартову произведению `segments × formats`, что и `GetAssets`. Один вызов генерирует ровно один тег `<picture>` (или `<img>`, если формат один).
+Возвращает **строку** — HTML-разметку `<picture>`/`<img>` по тем же ассетам, что и `GetAssets` (ассеты группируются по типу). Один вызов генерирует ровно один тег `<picture>` (или `<img>`, если формат один).
 
 `options` — HTML-атрибуты:
 
@@ -304,7 +304,7 @@ $imager->GetAsset("/test.gif", [200, 200]);         // список [width, heig
 $imager->GetAsset("/test.gif", "200x200", "webp");       // + формат
 $imager->GetAsset("/test.gif", "200x200", "webp", 2);    // + dpr
 $imager->GetAsset("/test.gif", "200x200", "webp", "2");  // dpr строкой
-$imager->GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2);  // 4 ассета
+$imager->GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2);  // 2 ассета (по одному на формат)
 ```
 
 ## Примеры
@@ -320,9 +320,9 @@ echo $asset->type;   // image/gif
 // $asset->paths: [AssetPath{path: '.../200x200.gif', width: 200, height: 200},
 //                 AssetPath{path: '.../200x200@2.gif', width: 400, height: 400, dpr: 2}]
 
-// Список ассетов (декартово произведение)
+// Список ассетов (по одному AssetType на формат)
 $assets = $imager->GetAssets("/test.gif", [["width" => 200, "height" => 200], ["height" => 400]], ["webp", "gif"], 1);
-echo count($assets);  // 4
+echo count($assets);  // 2
 
 // Только URL основного варианта
 $url = $imager->GetAssetPath("/test.gif", "200x200", "webp");

@@ -363,75 +363,36 @@ export class Imager {
     //  Построение списка paths (общий для GetAssets)                     //
     // ------------------------------------------------------------------ //
 
-    /** Добавляет в result assets для одного сегмента; возвращает новый idx. */
-    protected _appendSegmentAssets(
-        result: AssetType[],
-        idx: number,
+    /** Пути для одного сегмента: все dpr-шаги подряд (сегмент-мажорно). */
+    protected _segmentPaths(
         prefix: string,
-        segment: SegmentValue,
-        effList: string[],
-        mimeList: string[],
+        segStr: string,
+        isSize: boolean,
+        width: number,
+        height: number,
+        eff: string,
         dprVal: number,
         explicit: boolean,
         maxSteps: number,
-        sourceFormat: string,
-    ): number {
-        const ctx = this._parseSegment(segment);
-        const segStr = ctx.segStr;
-        const isSize = ctx.isSize;
-        const width = ctx.width;
-        const height = ctx.height;
-
-        // DPR-базы строятся один раз на segment (не на segment×format)
-        const base1 = prefix + segStr + ".";
-        const base2 = maxSteps >= 2 ? prefix + segStr + "@2." : "";
-        const base3 = maxSteps >= 3 ? prefix + segStr + "@3." : "";
-
-        const nf = effList.length;
-        for (let j = 0; j < nf; j++) {
-            const eff = effList[j];
-            const paths = new Array<AssetPath>(maxSteps);
-            const p1: AssetPath = { path: base1 + eff };
+    ): AssetPath[] {
+        const paths = new Array<AssetPath>(maxSteps);
+        for (let step = 1; step <= maxSteps; step++) {
+            const suffix = step >= 2 ? "@" + step : "";
+            const item: AssetPath = { path: prefix + segStr + suffix + "." + eff };
             if (dprVal === 1 && explicit) {
-                p1.dpr = 1;
+                item.dpr = 1;
+            } else if (step >= 2) {
+                item.dpr = step;
             }
             if (isSize && width > 0) {
-                p1.width = width;
+                item.width = step >= 2 ? width * step : width;
             }
             if (isSize && height > 0) {
-                p1.height = height;
+                item.height = step >= 2 ? height * step : height;
             }
-            paths[0] = p1;
-            if (maxSteps >= 2) {
-                const p2: AssetPath = { path: base2 + eff, dpr: 2 };
-                if (isSize && width > 0) {
-                    p2.width = width * 2;
-                }
-                if (isSize && height > 0) {
-                    p2.height = height * 2;
-                }
-                paths[1] = p2;
-            }
-            if (maxSteps >= 3) {
-                const p3: AssetPath = { path: base3 + eff, dpr: 3 };
-                if (isSize && width > 0) {
-                    p3.width = width * 3;
-                }
-                if (isSize && height > 0) {
-                    p3.height = height * 3;
-                }
-                paths[2] = p3;
-            }
-            const asset: AssetType = { type: mimeList[j], paths };
-            if (eff === sourceFormat) {
-                asset.source_format = true;
-            }
-            if (eff === "jpg" || eff === "jpeg" || eff === "gif" || eff === "png") {
-                asset.all_support = true;
-            }
-            result[idx++] = asset;
+            paths[step - 1] = item;
         }
-        return idx;
+        return paths;
     }
 
     // ------------------------------------------------------------------ //
@@ -552,37 +513,78 @@ export class Imager {
             mimeList[i] = mimeFor(eff) || "";
         }
 
-        // размер результата известен заранее
-        let segCount: number;
+        // сегменты: не задан → [null] → "x"
+        let segList: SegmentValue[];
         if (segments === null || segments === undefined) {
-            segCount = 1;
+            segList = [null];
         } else if (Array.isArray(segments)) {
-            segCount = segments.length;
+            segList = segments as unknown as SegmentValue[];
         } else {
-            segCount = 1;
+            segList = [segments as SegmentValue];
         }
 
-        const result = new Array<AssetType>(segCount * nf);
-        let idx = 0;
-
-        if (segments === null || segments === undefined) {
-            idx = this._appendSegmentAssets(
-                result, idx, prefix, null,
-                effList, mimeList, dprVal, explicit, maxSteps, sourceFormat,
-            );
-        } else if (Array.isArray(segments)) {
-            const segs = segments as unknown as SegmentValue[];
-            for (let i = 0; i < segs.length; i++) {
-                idx = this._appendSegmentAssets(
-                    result, idx, prefix, segs[i] as SegmentValue,
-                    effList, mimeList, dprVal, explicit, maxSteps, sourceFormat,
+        // Пути всех сегментов по каждому формату (сегмент-мажорно).
+        // pathsByFmt[f] — массив AssetPath для формата f.
+        const pathsByFmt: AssetPath[][] = new Array(nf);
+        for (let f = 0; f < nf; f++) {
+            pathsByFmt[f] = [];
+        }
+        for (let s = 0; s < segList.length; s++) {
+            const ctx = this._parseSegment(segList[s]);
+            for (let f = 0; f < nf; f++) {
+                const segPaths = this._segmentPaths(
+                    prefix, ctx.segStr, ctx.isSize, ctx.width, ctx.height,
+                    effList[f], dprVal, explicit, maxSteps,
                 );
+                pathsByFmt[f].push(...segPaths);
             }
-        } else {
-            idx = this._appendSegmentAssets(
-                result, idx, prefix, segments as SegmentValue,
-                effList, mimeList, dprVal, explicit, maxSteps, sourceFormat,
-            );
+        }
+
+        // dpr из фактических размеров: базовая ширина = ширина первого
+        // участника с известной шириной; dpr = фактическая ширина / базовая.
+        // Если ширины нет — по высоте; если ни того, ни другого — без dpr.
+        const result = new Array<AssetType>(nf);
+        for (let f = 0; f < nf; f++) {
+            const paths = pathsByFmt[f];
+            let baseWidth = 0;
+            let baseHeight = 0;
+            for (const item of paths) {
+                if (baseWidth === 0 && item.width !== undefined && item.width > 0) {
+                    baseWidth = item.width;
+                }
+                if (baseHeight === 0 && item.height !== undefined && item.height > 0) {
+                    baseHeight = item.height;
+                }
+            }
+            for (let j = 0; j < paths.length; j++) {
+                const item = paths[j];
+                let dpr: number | undefined;
+                if (baseWidth > 0 && item.width !== undefined && item.width > 0) {
+                    dpr = item.width / baseWidth;
+                } else if (baseHeight > 0 && item.height !== undefined && item.height > 0) {
+                    dpr = item.height / baseHeight;
+                }
+                if (dpr === undefined) {
+                    continue;
+                }
+                // пересоздаём с порядком ключей path, dpr, width, height
+                const rebuilt: AssetPath = { path: item.path, dpr };
+                if (item.width !== undefined) {
+                    rebuilt.width = item.width;
+                }
+                if (item.height !== undefined) {
+                    rebuilt.height = item.height;
+                }
+                paths[j] = rebuilt;
+            }
+            const asset: AssetType = { type: mimeList[f], paths };
+            if (effList[f] === sourceFormat) {
+                asset.source_format = true;
+            }
+            if (effList[f] === "jpg" || effList[f] === "jpeg" || effList[f] === "gif" || effList[f] === "png") {
+                asset.all_support = true;
+            }
+            result[f] = asset;
         }
 
         return result;

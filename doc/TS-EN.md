@@ -112,11 +112,11 @@ Returns a **single** `AssetType`. `paths` contains all dpr variants from 1 to th
 
 #### GetAssets
 
-Returns a **list** of `AssetType` — Cartesian product of `segments × formats` (outer loop — segments). `segments` not set → `["x"]`. `formats` not set → `formats` option → `[format]` → `[source format]`.
+Returns a **list** of `AssetType` — one per format (all assets with the same type are merged into a single `AssetType`). Inside `paths` the order is **segment-major**: for each segment all dpr steps in a row. The `dpr` of each path is recalculated from actual sizes: the base is the width (or height) of the first participant with a known size, `dpr = actual width / base width`. `segments` not set → `["x"]`. `formats` not set → `formats` option → `[format]` → `[source format]`.
 
 #### GetAssetsHtml
 
-Returns a **string** — HTML markup `<picture>`/`<img>` for the same Cartesian product `segments × formats` as `GetAssets`. A single call generates exactly one `<picture>` tag (or `<img>` if there is only one format).
+Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as `GetAssets` (assets are grouped by type). A single call generates exactly one `<picture>` tag (or `<img>` if there is only one format).
 
 `options` — HTML attributes:
 
@@ -325,7 +325,7 @@ imager.GetAsset("/test.gif", [200, 200]);         // tuple [width, height] → "
 imager.GetAsset("/test.gif", "200x200", "webp");       // + format
 imager.GetAsset("/test.gif", "200x200", "webp", 2);    // + dpr
 imager.GetAsset("/test.gif", "200x200", "webp", "2");  // dpr as a string
-imager.GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2);  // 4 assets
+imager.GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2);  // 2 assets (one per format)
 ```
 
 ## Examples
@@ -343,9 +343,9 @@ console.log(asset.type);   // image/gif
 console.log(asset.paths);  // [{path: '.../200x200.gif', width: 200, height: 200},
                            //  {path: '.../200x200@2.gif', width: 400, height: 400, dpr: 2}]
 
-// Asset list (Cartesian product)
+// Asset list (one AssetType per format)
 const assets = imager.GetAssets("/test.gif", [{ width: 200, height: 200 }, { height: 400 }], ["webp", "gif"], 1);
-console.log(assets.length);  // 4
+console.log(assets.length);  // 2
 
 // Primary variant URL only
 const url = imager.GetAssetPath("/test.gif", "200x200", "webp");

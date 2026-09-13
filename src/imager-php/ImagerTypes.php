@@ -19,8 +19,8 @@ final class AssetPath
     /** Полный URL ассета (всегда). */
     public string $path = "";
 
-    /** Итоговое dpr (включается при dpr >= 2 или явном dpr = 1). */
-    public ?int $dpr = null;
+    /** Итоговое dpr (включается при dpr >= 2 или явном dpr = 1; может быть дробным). */
+    public ?float $dpr = null;
 
     /** Ширина сегмента (только для size-сегмента; умножена на dpr при dpr >= 2). */
     public ?int $width = null;

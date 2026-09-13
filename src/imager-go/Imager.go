@@ -318,11 +318,11 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 	item := AssetPath{}
 	if dprVal >= 2 {
 		item.Path = prefix + segStr + "@" + strconv.Itoa(dprVal) + "." + outFormat
-		item.Dpr = dprVal
+		item.Dpr = float64(dprVal)
 	} else {
 		item.Path = prefix + segStr + "." + outFormat
 		if explicit && dprVal == 1 {
-			item.Dpr = 1
+			item.Dpr = 1.0
 		}
 	}
 	if isSize && width > 0 {
@@ -353,7 +353,12 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 	return asset
 }
 
-// Декартово произведение segments × formats.
+// Один AssetType на формат; paths — все сегменты × dpr-шаги.
+//
+// Порядок paths — сегмент-мажорный: для каждого сегмента все dpr-шаги
+// подряд. dpr вычисляется из фактических размеров: базовая ширина =
+// ширина первого участника с известной шириной, dpr = фактическая
+// ширина / базовая (или по высоте, если ширины нет).
 func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) []AssetType {
 	// segments: не задан → [nil] → "x"
 	var segList []any
@@ -407,17 +412,12 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 		maxSteps = 3
 	}
 
-	// --- Точные ёмкости: по одному массиву на результат и на все paths ---
-	nSeg := len(segList)
+	// Пути всех сегментов по каждому формату (сегмент-мажорно).
 	nFmt := len(fmtList)
-	nTypes := nSeg * nFmt
-	nPaths := nTypes * maxSteps
-
-	result := make([]AssetType, nTypes)
-	allPaths := make([]AssetPath, nPaths)
-
-	idx := 0
-	pidx := 0
+	pathsByFmt := make([][]AssetPath, nFmt)
+	for fi := range nFmt {
+		pathsByFmt[fi] = []AssetPath{}
+	}
 	for _, seg := range segList {
 		segStr, isSize, width, height := normalizeSegment(seg)
 		for fi := range nFmt {
@@ -425,17 +425,14 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 			if eff == "" {
 				eff = sourceFormat
 			}
-			// слайс одного AssetType внутри общего массива
-			paths := allPaths[pidx : pidx+maxSteps]
-			pidx += maxSteps
 			for step := 1; step <= maxSteps; step++ {
 				item := AssetPath{
 					Path: prefix + segStr + dprSuffixes[step] + "." + eff,
 				}
 				if dprVal == 1 && explicit {
-					item.Dpr = 1
+					item.Dpr = 1.0
 				} else if step >= 2 {
-					item.Dpr = step
+					item.Dpr = float64(step)
 				}
 				if isSize && width > 0 {
 					multiply := 1
@@ -451,21 +448,48 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 					}
 					item.Height = height * multiply
 				}
-				paths[step-1] = item
+				pathsByFmt[fi] = append(pathsByFmt[fi], item)
 			}
-			asset := AssetType{
-				Type:  mimeFor(eff),
-				Paths: paths,
-			}
-			if eff == sourceFormat {
-				asset.SourceFormat = boolPtr(true)
-			}
-			if eff == "jpg" || eff == "jpeg" || eff == "gif" || eff == "png" {
-				asset.AllSupport = boolPtr(true)
-			}
-			result[idx] = asset
-			idx++
 		}
+	}
+
+	// dpr из фактических размеров: базовая ширина = ширина первого
+	// участника с известной шириной; dpr = фактическая ширина / базовая.
+	// Если ширины нет — по высоте; если ни того, ни другого — без dpr.
+	result := make([]AssetType, nFmt)
+	for fi := range nFmt {
+		eff := fmtList[fi]
+		if eff == "" {
+			eff = sourceFormat
+		}
+		paths := pathsByFmt[fi]
+		baseWidth, baseHeight := 0, 0
+		for j := range paths {
+			if baseWidth == 0 && paths[j].Width > 0 {
+				baseWidth = paths[j].Width
+			}
+			if baseHeight == 0 && paths[j].Height > 0 {
+				baseHeight = paths[j].Height
+			}
+		}
+		for j := range paths {
+			if baseWidth > 0 && paths[j].Width > 0 {
+				paths[j].Dpr = float64(paths[j].Width) / float64(baseWidth)
+			} else if baseHeight > 0 && paths[j].Height > 0 {
+				paths[j].Dpr = float64(paths[j].Height) / float64(baseHeight)
+			}
+		}
+		asset := AssetType{
+			Type:  mimeFor(eff),
+			Paths: paths,
+		}
+		if eff == sourceFormat {
+			asset.SourceFormat = boolPtr(true)
+		}
+		if eff == "jpg" || eff == "jpeg" || eff == "gif" || eff == "png" {
+			asset.AllSupport = boolPtr(true)
+		}
+		result[fi] = asset
 	}
 
 	return result

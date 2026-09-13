@@ -26,7 +26,7 @@ class AssetPath(TypedDict, total=False):
     """
 
     path: str
-    dpr: int
+    dpr: Union[int, float]
     width: int
     height: int
 

@@ -136,7 +136,7 @@ url := i.GetAssetPath("/test.gif", "200x200", "webp")
 | Method | Signature | Result |
 |---|---|---|
 | `GetAsset` | `(source, segment?, format?, dpr?)` | single `AssetType` |
-| `GetAssets` | `(source, segments?, formats?, dprs?)` | `AssetType[]` — Cartesian product of `segments × formats` |
+| `GetAssets` | `(source, segments?, formats?, dprs?)` | `AssetType[]` — one per format (assets with the same type are merged) |
 | `GetAssetsHtml` | `(source, segments?, formats?, dprs?, options?)` | `string` — HTML `<picture>`/`<img>` |
 | `GetAssetPath` | `(source, segment?, format?, dpr?)` | `string` — URL of the primary variant |
 | `AdminGenerate` | `(target, wait?)` | `bool` — HTTP 200/202 (in TS — `ImagerServer` only) |
@@ -181,7 +181,7 @@ imager.GetAsset("/test.gif", [200, 200])           # array → "200x200"
 imager.GetAsset("/test.gif", "200x200", "webp")    # + format
 imager.GetAsset("/test.gif", "200x200", "webp", 2) # + dpr (variants without suffix and @2)
 
-imager.GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], "2")  # 4 assets
+imager.GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], "2")  # 2 assets (one per format)
 imager.AdminGenerate("/test.gif", True)                   # by source
 imager.AdminGenerate(asset)                               # by AssetType
 imager.AdminDelete(["/path/a.webp", "/path/b.webp"])      # list of ready paths

@@ -11,10 +11,10 @@ package imager
 // Все поля кроме Path опциональны: включаются в сериализацию только
 // если заданы, в порядке path, dpr, width, height.
 type AssetPath struct {
-	Path   string `json:"path"`
-	Dpr    int    `json:"dpr,omitempty"`
-	Width  int    `json:"width,omitempty"`
-	Height int    `json:"height,omitempty"`
+	Path   string  `json:"path"`
+	Dpr    float64 `json:"dpr,omitempty"`
+	Width  int     `json:"width,omitempty"`
+	Height int     `json:"height,omitempty"`
 }
 
 // Результат GetAsset / элемента GetAssets.

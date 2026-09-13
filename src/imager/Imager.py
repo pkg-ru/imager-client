@@ -417,7 +417,13 @@ class Imager:
         formats: Optional[Any] = None,
         dprs: Optional[Union[int, str]] = None,
     ) -> List[AssetType]:
-        """Декартово произведение segments × formats."""
+        """Один AssetType на формат; paths — все сегменты × dpr-шаги.
+
+        Порядок paths — сегмент-мажорный: для каждого сегмента все
+        dpr-шаги подряд. dpr вычисляется из фактических размеров:
+        базовая ширина = ширина первого участника с известной шириной,
+        dpr = фактическая ширина / базовая (или по высоте, если ширины нет).
+        """
         # segments: не задан → [None] → "x"
         if segments is None:
             seg_list: list = [None]
@@ -466,18 +472,51 @@ class Imager:
             eff = fmt if fmt != "" else source_format
             fmt_data.append((eff, mime_for(eff)))
 
-        result: List[AssetType] = []
-        append = result.append
+        # Пути всех сегментов по каждому формату (сегмент-мажорно).
+        paths_by_fmt: List[List[dict]] = [[] for _ in fmt_data]
         for seg_str, is_size, width, height in seg_data:
-            for eff, mime in fmt_data:
-                paths = self._asset_paths(prefix, seg_str, is_size, width, height,
-                                          dpr_val, explicit, eff)
-                asset: AssetType = {"type": mime, "paths": paths}
-                if eff == source_format:
-                    asset["source_format"] = True
-                if eff in ("jpg", "jpeg", "gif", "png"):
-                    asset["all_support"] = True
-                append(asset)
+            for fi, (eff, _mime) in enumerate(fmt_data):
+                seg_paths = self._asset_paths(prefix, seg_str, is_size, width, height,
+                                              dpr_val, explicit, eff)
+                paths_by_fmt[fi].extend(seg_paths)
+
+        # dpr из фактических размеров: базовая ширина = ширина первого
+        # участника с известной шириной; dpr = фактическая ширина / базовая.
+        # Если ширины нет — по высоте; если ни того, ни другого — без dpr.
+        # Целый результат → int (для единой JSON-сериализации с TS).
+        # Порядок ключей: path, dpr, width, height (для golden-тестов).
+        result: List[AssetType] = []
+        for fi, (eff, mime) in enumerate(fmt_data):
+            paths = paths_by_fmt[fi]
+            base_width = 0
+            base_height = 0
+            for item in paths:
+                if base_width == 0 and item.get("width", 0) > 0:
+                    base_width = item["width"]
+                if base_height == 0 and item.get("height", 0) > 0:
+                    base_height = item["height"]
+            for idx, item in enumerate(paths):
+                dpr = None
+                if base_width > 0 and item.get("width", 0) > 0:
+                    dpr = item["width"] / base_width
+                elif base_height > 0 and item.get("height", 0) > 0:
+                    dpr = item["height"] / base_height
+                if dpr is None:
+                    continue
+                if dpr == int(dpr):
+                    dpr = int(dpr)
+                rebuilt: Dict[str, Any] = {"path": item["path"], "dpr": dpr}
+                if item.get("width") is not None:
+                    rebuilt["width"] = item["width"]
+                if item.get("height") is not None:
+                    rebuilt["height"] = item["height"]
+                paths[idx] = rebuilt
+            asset: AssetType = {"type": mime, "paths": paths}
+            if eff == source_format:
+                asset["source_format"] = True
+            if eff in ("jpg", "jpeg", "gif", "png"):
+                asset["all_support"] = True
+            result.append(asset)
         return result
 
     # ------------------------------------------------------------------ #

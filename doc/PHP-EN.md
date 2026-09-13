@@ -95,7 +95,7 @@ public function GetAssets(
 ): array;                     // AssetType[]
 ```
 
-Returns a **list** of `AssetType` — Cartesian product of `segments × formats` (outer loop — segments). `segments` not set → `["x"]`. `formats` not set → `formats` option → `[format]` → `[source format]`.
+Returns a **list** of `AssetType` — one per format (all assets with the same type are merged into a single `AssetType`). Inside `paths` the order is **segment-major**: for each segment all dpr steps in a row. The `dpr` of each path is recalculated from actual sizes: the base is the width (or height) of the first participant with a known size, `dpr = actual width / base width`. `segments` not set → `["x"]`. `formats` not set → `formats` option → `[format]` → `[source format]`.
 
 ### GetAssetsHtml
 
@@ -109,7 +109,7 @@ public function GetAssetsHtml(
 ): string;
 ```
 
-Returns a **string** — HTML markup `<picture>`/`<img>` for the same Cartesian product `segments × formats` as `GetAssets`. A single call generates exactly one `<picture>` tag (or `<img>` if there is only one format).
+Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as `GetAssets` (assets are grouped by type). A single call generates exactly one `<picture>` tag (or `<img>` if there is only one format).
 
 `options` — HTML attributes:
 
@@ -304,7 +304,7 @@ $imager->GetAsset("/test.gif", [200, 200]);         // list [width, height] → 
 $imager->GetAsset("/test.gif", "200x200", "webp");       // + format
 $imager->GetAsset("/test.gif", "200x200", "webp", 2);    // + dpr
 $imager->GetAsset("/test.gif", "200x200", "webp", "2");  // dpr as a string
-$imager->GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2);  // 4 assets
+$imager->GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2);  // 2 assets (one per format)
 ```
 
 ## Examples
@@ -320,9 +320,9 @@ echo $asset->type;   // image/gif
 // $asset->paths: [AssetPath{path: '.../200x200.gif', width: 200, height: 200},
 //                 AssetPath{path: '.../200x200@2.gif', width: 400, height: 400, dpr: 2}]
 
-// Asset list (Cartesian product)
+// Asset list (one AssetType per format)
 $assets = $imager->GetAssets("/test.gif", [["width" => 200, "height" => 200], ["height" => 400]], ["webp", "gif"], 1);
-echo count($assets);  // 4
+echo count($assets);  // 2
 
 // Primary variant URL only
 $url = $imager->GetAssetPath("/test.gif", "200x200", "webp");

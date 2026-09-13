@@ -70,6 +70,7 @@
                 "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/200x200.webp",
+                        "dpr": 1,
                         "width": 200,
                         "height": 200
                     },
@@ -84,6 +85,21 @@
                         "dpr": 3,
                         "width": 600,
                         "height": 600
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x.webp",
+                        "dpr": 2,
+                        "width": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x@2.webp",
+                        "dpr": 4,
+                        "width": 800
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-png/400x@3.webp",
+                        "dpr": 6,
+                        "width": 1200
                     }
                 ]
             },
@@ -92,6 +108,7 @@
                 "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/200x200.avif",
+                        "dpr": 1,
                         "width": 200,
                         "height": 200
                     },
@@ -106,43 +123,20 @@
                         "dpr": 3,
                         "width": 600,
                         "height": 600
-                    }
-                ]
-            },
-            {
-                "type": "image/webp",
-                "paths": [
-                    {
-                        "path": "https://imgs.example.com/images/test-png/400x.webp",
-                        "width": 400
                     },
-                    {
-                        "path": "https://imgs.example.com/images/test-png/400x@2.webp",
-                        "dpr": 2,
-                        "width": 800
-                    },
-                    {
-                        "path": "https://imgs.example.com/images/test-png/400x@3.webp",
-                        "dpr": 3,
-                        "width": 1200
-                    }
-                ]
-            },
-            {
-                "type": "image/avif",
-                "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/400x.avif",
+                        "dpr": 2,
                         "width": 400
                     },
                     {
                         "path": "https://imgs.example.com/images/test-png/400x@2.avif",
-                        "dpr": 2,
+                        "dpr": 4,
                         "width": 800
                     },
                     {
                         "path": "https://imgs.example.com/images/test-png/400x@3.avif",
-                        "dpr": 3,
+                        "dpr": 6,
                         "width": 1200
                     }
                 ]
@@ -751,16 +745,13 @@
                 "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/200x200.webp",
+                        "dpr": 1,
                         "width": 200,
                         "height": 200
-                    }
-                ]
-            },
-            {
-                "type": "image/webp",
-                "paths": [
+                    },
                     {
                         "path": "https://imgs.example.com/images/test-png/x400.webp",
+                        "dpr": 2,
                         "height": 400
                     }
                 ]
@@ -883,6 +874,7 @@
                 "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/200x200.webp",
+                        "dpr": 1,
                         "width": 200,
                         "height": 200
                     }
@@ -893,6 +885,7 @@
                 "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/200x200.avif",
+                        "dpr": 1,
                         "width": 200,
                         "height": 200
                     }
