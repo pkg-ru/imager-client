@@ -19,10 +19,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"strings"
 
-	imagergo "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
+	imagergo "gitverse.ru/pkg-ru/imager-client/v2"
 )
 
 // ------------------------------------------------------------------ //
@@ -307,6 +308,153 @@ func Canonical(expected any, method string) string {
 	return expected.(string)
 }
 
+// ------------------------------------------------------------------ //
+//  Сравнение HTML: атрибуты без учёта порядка (наличие + значения)   //
+// ------------------------------------------------------------------ //
+
+// Разбирает HTML-строку на список тегов. Каждый тег — [2]any:
+// [0] — имя тега (string), [1] — список атрибутов [][2]any (имя, значение).
+// Значение nil — атрибут без значения (булев). Текст между тегами
+// игнорируется (в GetAssetsHtml его нет).
+func parseHtmlTags(html string) [][2]any {
+	tags := make([][2]any, 0, 8)
+	rest := html
+	for {
+		_, after, ok := strings.Cut(rest, "<")
+		if !ok {
+			break
+		}
+		// Ищем закрывающую '>' в after.
+		tagBody, tail, ok2 := strings.Cut(after, ">")
+		if !ok2 {
+			break
+		}
+		rest = tail
+		// Пропускаем закрывающие теги и комментарии/декларации.
+		if strings.HasPrefix(tagBody, "/") || strings.HasPrefix(tagBody, "!") {
+			continue
+		}
+		name, attrs := parseTagAttrs(tagBody)
+		tags = append(tags, [2]any{name, attrs})
+	}
+	return tags
+}
+
+// Разбирает содержимое тега (без < >) на имя и список атрибутов.
+func parseTagAttrs(tag string) (string, [][2]any) {
+	// Имя тега — до первого пробела.
+	sp := strings.Index(tag, " ")
+	if sp < 0 {
+		return tag, make([][2]any, 0, 0)
+	}
+	name := tag[0:sp]
+	attrs := make([][2]any, 0, 8)
+	rest := strings.TrimSpace(tag[sp:])
+	for rest != "" {
+		// Имя атрибута — до '=' или пробела.
+		eq := strings.Index(rest, "=")
+		sp2 := strings.Index(rest, " ")
+		var attrName, afterName string
+		if eq >= 0 && (sp2 < 0 || eq < sp2) {
+			attrName = rest[0:eq]
+			afterName = rest[eq+1:]
+		} else if sp2 >= 0 {
+			attrName = rest[0:sp2]
+			afterName = rest[sp2:]
+		} else {
+			attrName = rest
+			afterName = ""
+		}
+		attrName = strings.TrimSpace(attrName)
+		afterName = strings.TrimSpace(afterName)
+
+		if attrName == "" {
+			rest = afterName
+			continue
+		}
+
+		// Значение в кавычках (или без кавычек до пробела).
+		var value any
+		if strings.HasPrefix(afterName, `"`) {
+			// Ищем закрывающую кавычку.
+			valBody, valTail, okv := strings.Cut(afterName[1:], `"`)
+			if okv {
+				value = valBody
+				rest = strings.TrimSpace(valTail)
+			} else {
+				value = afterName[1:]
+				rest = ""
+			}
+		} else if afterName != "" {
+			sp3 := strings.Index(afterName, " ")
+			if sp3 >= 0 {
+				value = afterName[0:sp3]
+				rest = strings.TrimSpace(afterName[sp3:])
+			} else {
+				value = afterName
+				rest = ""
+			}
+		} else {
+			// Атрибут без значения (булев).
+			value = nil
+			rest = ""
+		}
+		attrs = append(attrs, [2]any{attrName, value})
+	}
+	return name, attrs
+}
+
+// Сравнивает два списка атрибутов как мультимножества (порядок не важен).
+func attrsEqual(a, b [][2]any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	used := make(map[int]bool, len(b))
+	for _, ka := range a {
+		found := false
+		for j := range b {
+			if used[j] {
+				continue
+			}
+			kb := b[j]
+			if ka[0].(string) == kb[0].(string) && attrValueEqual(ka[1], kb[1]) {
+				used[j] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// Сравнивает значения атрибутов (nil — атрибут без значения).
+func attrValueEqual(a, b any) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return fmt.Sprintf("%v", a) == fmt.Sprintf("%v", b)
+}
+
+// Сравнивает HTML-строки: порядок тегов важен, порядок атрибутов — нет.
+func htmlEqual(a, b string) bool {
+	ta := parseHtmlTags(a)
+	tb := parseHtmlTags(b)
+	if len(ta) != len(tb) {
+		return false
+	}
+	for i := range ta {
+		na, aa := ta[i][0].(string), ta[i][1].([][2]any)
+		nb, ab := tb[i][0].(string), tb[i][1].([][2]any)
+		if na != nb || !attrsEqual(aa, ab) {
+			return false
+		}
+	}
+	return true
+}
+
 func RunGolden() int {
 	cases := LoadFixture()
 	failed := 0
@@ -320,15 +468,33 @@ func RunGolden() int {
 		actual := RunCase(c)
 		expected := m["expected"]
 		var actualStr, expectedStr string
-		if method == "GetAssetPath" || method == "GetAssetsHtml" {
+		ok := false
+		switch method {
+		case "GetAssetPath":
 			// строки сравниваем напрямую (без JSON-кавычек)
 			actualStr = actual.(string)
 			expectedStr = expected.(string)
-		} else {
+			ok = actualStr == expectedStr
+		case "GetAssetsHtml":
+			// HTML: порядок тегов важен, порядок атрибутов — нет.
+			actualStr = actual.(string)
+			expectedStr = expected.(string)
+			ok = htmlEqual(actualStr, expectedStr)
+		default:
+			// JSON-объекты/массивы: сравниваем без учёта порядка ключей.
+			// Обе стороны нормализуем через Marshal/Unmarshal в any, чтобы
+			// типы совпадали (числа → float64), затем reflect.DeepEqual
+			// (для map порядок ключей не важен).
 			actualStr = Dumps(actual)
 			expectedStr = Canonical(expected, method)
+			var actualAny, expectedAny any
+			aData, _ := json.Marshal(actual)
+			eData, _ := json.Marshal(expected)
+			_ = json.Unmarshal(aData, &actualAny)
+			_ = json.Unmarshal(eData, &expectedAny)
+			ok = reflect.DeepEqual(actualAny, expectedAny)
 		}
-		if actualStr != expectedStr {
+		if !ok {
 			failed++
 			fmt.Println("[FAIL] id=" + strconv.Itoa(cid) + " " + method)
 			fmt.Println("  expected: " + expectedStr)
@@ -609,9 +775,18 @@ func ParseJsonObject(s string) map[string]string {
 // запуска тестов всех языков из одного шага CI.
 
 func runExternal(name string, args ...string) int {
+	return runExternalDir("", name, args...)
+}
+
+// runExternalDir — как runExternal, но с рабочей директорией dir
+// (пустая строка — корень проекта).
+func runExternalDir(dir, name string, args ...string) int {
 	fmt.Println("---")
 	fmt.Println(">>>", name, strings.Join(args, " "))
 	cmd := exec.Command(name, args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -626,10 +801,14 @@ func main() {
 	failed += RunGolden()
 	failed += RunAdmin()
 	// Оркестратор: единый запуск тестов всех языков (TS, PHP, Python).
-	// Go-часть — выше (RunGolden/RunAdmin.
+	// Go-часть — выше (RunGolden/RunAdmin).
 	failed += runExternal("npm", "test")
 	failed += runExternal("php", "test/test.php")
 	failed += runExternal("python", "test/test.py")
+	// Фреймворк-пакеты: golden-сценарий по test/fixture.json (HTML-кейсы).
+	// Twig в golden-прогоне не участвует (сверяется с ядром PHP локально).
+	failed += runExternalDir("packages/react", "npm", "test")
+	failed += runExternalDir("packages/vue", "npm", "test")
 	if failed > 0 {
 		fmt.Println("=== RESULT: FAIL ===")
 		os.Exit(1)

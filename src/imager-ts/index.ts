@@ -1,3 +1,9 @@
+/*! @license
+ * imager-client — клиент микросервиса Imager
+ * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Автор: Vladislav Altukhov (https://altuh.ru/about)
+ * Демо: https://altuh.ru/demo/imager
+ */
 /** Точка входа клиентской (браузерной) части imager-client.
 
 Экспортирует только клиентские методы/типы — без служебных полей
@@ -12,7 +18,12 @@ export {
     Segment,
     mimeFor,
 } from "./ImagerTypes";
-export { normalizeProps, ImagerComponentProps, NormalizedCall } from "./component";
+export {
+    normalizeProps,
+    ImagerComponentProps,
+    NormalizedCall,
+    NormalizePropsOptions,
+} from "./component";
 export {
     IMG_ATTRS,
     HtmlGroup,

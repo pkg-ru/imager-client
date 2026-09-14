@@ -4,6 +4,7 @@
 
 - [Русская версия](./PY-RU.md)
 - [Overview](../README.md)
+- [Demo](https://altuh.ru/demo/imager) — example of the microservice and client part in action
 
 ---
 
@@ -125,7 +126,9 @@ Rules:
 - Values are HTML-escaped (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Inside `<picture>` tags are divided by type (format): all paths of one format are merged into a single `srcset`.
 - For `<img>` the group is chosen: 1) source format (`source_format: true`); 2) first universally supported (`all_support: true`); 3) the last one. The remaining formats become `<source type="...">`.
-- `srcset` descriptors: if `sizes` is passed in `options` — `w`-descriptors by width (`200w`, `400w`); otherwise — `x`-descriptors by dpr (`1x`, `2x`, `3x`); if there is no dpr but height exists — dpr is computed from the height ratio (fractional allowed, e.g. `1.5x`); sizes are never auto-generated.
+- `srcset` descriptors: if `sizes` is passed in `options` — **w-mode**: `w`-descriptors by width (`200w`, `400w`); paths without width (segment `x`, original size) are **excluded** from srcset — the original stays only in `src` of `<img>` as a fallback; if a group has only `x`-paths — srcset is empty. Otherwise — **x-mode**: `x`-descriptors by dpr (`1x`, `2x`, `3x`); if there is no dpr but height exists — dpr is computed from the height ratio (fractional allowed, e.g. `1.5x`); `x`-paths are included in srcset with the **max+1** heuristic: `max_dpr` is computed **only from sized paths** (those with width or height); dpr fields of `x`-paths (steps 1, 2, 3...) do not participate. If sized paths exist (`max_dpr > 0`) — descriptor = `(max_dpr + 1) × dpr step` (approximate, since the real original size is unknown); if there are no sized paths but dpr steps exist (`dprs ≥ 2`) — descriptor = dpr step (`1x`, `2x`, `3x`...); if there are neither sized paths nor dpr steps (`dprs = 0`) — the path goes into srcset **without a descriptor** (just the path, no ` 1x`). Sizes are never auto-generated.
+- `<source>` always has `srcset` (never `src`), even with a single path in the group; if srcset is empty (in w-mode all paths are `x`) — `<source>` is not rendered.
+- `<img>`: `srcset` is added only if there are more than 1 path **and** srcset is not empty; otherwise `<img>` has only `src`.
 - `width`/`height` on `<img>` are added from the base (first) path when known — for CLS. If the user provided their own `width`/`height` (directly or via `imgAttrs`) — automatic ones are not added (no duplication).
 - `imgAttrs` is merged with forwarded img attributes (`alt`, `sizes`, `loading`, `width`, `height`, `decoding`, `fetchpriority`): values from `imgAttrs` take priority. The `imgAttrs` key itself never lands on `<picture>`.
 - If there are no assets — an empty string is returned.
@@ -220,7 +223,7 @@ If `token` or `adminURL` is empty — admin methods return `False` **without** a
 
 - `dpr`/`dprs` — a number or digit string (`"2"`).
 - Result < 1 → not used (single path object without suffix and without `dpr` field).
-- Result = 1 (explicit) → single path object with `dpr: 1`.
+- Result = 1 (explicit) → single path object without `dpr` field (1x is the default descriptor; `dpr: 1` is added only if the group has a path with `dpr > 1`).
 - Result = 2 → `[no suffix, @2]`.
 - Result = 3 → `[no suffix, @2, @3]`.
 - Result > 3 → treated as 3.
@@ -269,7 +272,7 @@ Example result of `GetAsset("/test.gif", {"width": 200, "height": 200}, "gif", 2
 Path object field rules:
 
 - `path` — full URL, always present.
-- `dpr` — when dpr ≥ 2 or explicit dpr = 1.
+- `dpr` — when dpr ≥ 2; `dpr: 1` — only if the group has a path with `dpr > 1` (otherwise 1x is the default descriptor, no field).
 - `width`/`height` — only for size segments (`200x200`, `{w,h}`, `[w,h]`, `x`, etc.); multiplied by dpr when dpr ≥ 2. Not added for named presets.
 - `type` — MIME of the output format; video (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) and unknown format → `""`.
 - `source_format` — `true` when the output format matches the source file format; present in JSON only when `true`.

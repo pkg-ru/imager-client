@@ -10,6 +10,8 @@
     "include": [
         "test/test.ts",
         "src/**/*.ts",
-        "../../../src/imager-ts/**/*.ts"
+        "../../../src/imager-ts/**/*.ts",
+        "../../../test/html-parse.ts",
+        "../../../test/fixture-html.ts"
     ]
 }

@@ -186,5 +186,176 @@
                 "class": "wrap"
             }
         }
+    },
+    {
+        "id": 9,
+        "method": "NormalizeProps",
+        "args": {
+            "include": [
+                "alt",
+                "sizes",
+                "loading",
+                "lazy",
+                "decoding",
+                "fetchpriority",
+                "imgAttrs",
+                "class",
+                "id",
+                "style"
+            ],
+            "props": {
+                "src": "/f.webp",
+                "width": 200,
+                "height": 200,
+                "dpr": 2,
+                "format": "webp",
+                "alt": "Фото",
+                "sizes": "(max-width: 600px) 100vw, 50vw",
+                "loading": "lazy",
+                "lazy": true,
+                "decoding": "async",
+                "fetchpriority": "high",
+                "imgAttrs": {
+                    "class": "img",
+                    "width": 333
+                },
+                "class": "wrap",
+                "id": "main",
+                "style": "color: red",
+                "data-foo": "bar",
+                "onClick": "handler",
+                "key": "k1"
+            }
+        },
+        "expected": {
+            "source": "/f.webp",
+            "segments": {
+                "width": 200,
+                "height": 200
+            },
+            "formats": "webp",
+            "dprs": 2,
+            "options": {
+                "alt": "Фото",
+                "sizes": "(max-width: 600px) 100vw, 50vw",
+                "loading": "lazy",
+                "lazy": true,
+                "decoding": "async",
+                "fetchpriority": "high",
+                "imgAttrs": {
+                    "class": "img",
+                    "width": 333
+                },
+                "class": "wrap",
+                "id": "main",
+                "style": "color: red"
+            }
+        }
+    },
+    {
+        "id": 10,
+        "method": "NormalizeProps",
+        "args": {
+            "include": [
+                "alt",
+                "sizes",
+                "loading",
+                "lazy",
+                "decoding",
+                "fetchpriority",
+                "imgAttrs",
+                "class",
+                "id",
+                "style"
+            ],
+            "props": {
+                "source": "/g.png",
+                "preset": "thumb",
+                "formats": [
+                    "webp",
+                    "avif"
+                ],
+                "dprs": "3",
+                "alt": null,
+                "loading": "eager",
+                "lazy": null,
+                "fetchpriority": null,
+                "class": "thumb",
+                "id": null
+            }
+        },
+        "expected": {
+            "source": "/g.png",
+            "segments": "thumb",
+            "formats": [
+                "webp",
+                "avif"
+            ],
+            "dprs": "3",
+            "options": {
+                "loading": "eager",
+                "class": "thumb"
+            }
+        }
+    },
+    {
+        "id": 11,
+        "method": "NormalizeProps",
+        "args": {
+            "include": [
+                "alt",
+                "sizes",
+                "loading",
+                "lazy",
+                "decoding",
+                "fetchpriority",
+                "imgAttrs",
+                "class",
+                "id",
+                "style"
+            ],
+            "props": {
+                "src": "/h.jpg",
+                "segment": "200x200",
+                "dpr": 1,
+                "format": "png",
+                "data-foo": "bar",
+                "onClick": "handler",
+                "key": "k2"
+            }
+        },
+        "expected": {
+            "source": "/h.jpg",
+            "segments": "200x200",
+            "formats": "png",
+            "dprs": 1,
+            "options": {}
+        }
+    },
+    {
+        "id": 12,
+        "method": "NormalizeProps",
+        "args": {
+            "include": [
+                "alt",
+                "sizes",
+                "loading",
+                "lazy",
+                "decoding",
+                "fetchpriority",
+                "imgAttrs",
+                "class",
+                "id",
+                "style"
+            ],
+            "props": {}
+        },
+        "expected": {
+            "source": "",
+            "segments": null,
+            "formats": null,
+            "dprs": null,
+            "options": {}
+        }
     }
 ]

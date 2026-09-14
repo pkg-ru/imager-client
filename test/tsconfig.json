@@ -16,6 +16,8 @@
     },
     "include": [
         "test.ts",
+        "html-parse.ts",
+        "fixture-html.ts",
         "../src/imager-ts/**/*.ts",
         "../src/imager-ts-server/**/*.ts"
     ],

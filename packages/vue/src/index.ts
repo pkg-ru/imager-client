@@ -1,23 +1,29 @@
+/*! @license
+ * @pkg-ru/imager-vue — Vue 3-компоненты для микросервиса Imager
+ * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Автор: Vladislav Altukhov (https://altuh.ru/about)
+ * Демо: https://altuh.ru/demo/imager
+ */
 /** Vue 3-компоненты для микросервиса Imager.
-
-- ImagerPlugin — app.use(ImagerPlugin, {baseURL, format, dpr}) — провайдер по умолчанию;
-- ImagerProvider — компонент-провайдер с imager-инстансом;
-- ImagerAssets — <picture> + <source> + <img> из GetAssets();
-- ImagerAsset — один <img> из GetAsset().
-
-Рендер — нативные Vue-ноды (h()).
-*/
+ *
+ * - ImagerPlugin — app.use(ImagerPlugin, {baseURL, format, dpr});
+ * - ImagerProvider — компонент-провайдер;
+ * - ImagerAssets — <picture> + <source> + <img>;
+ * - ImagerAsset — один <img>.
+ *
+ * Рендер — нативные Vue-ноды (h()).
+ */
 import {
     App,
     InjectionKey,
     PropType,
-    computed,
     defineComponent,
     h,
     inject,
     provide,
 } from "vue";
-import { Imager, AssetPath, ImagerOptions, normalizeProps } from "../../../src/imager-ts";
+import { Imager, AssetPath, ImagerOptions } from "../../../src/imager-ts";
+import { ImagerComponentProps, normalizeProps } from "../../../src/imager-ts";
 import {
     buildSrcset,
     groupAssets,
@@ -26,8 +32,6 @@ import {
     useWidthDescriptors,
 } from "../../../src/imager-ts";
 
-// Re-export ядра: пакет самодостаточен, но можно использовать и свой инстанс
-// (например, ImagerServer с админ-методами) — типы совместимы.
 export {
     Imager,
     AssetPath,
@@ -51,19 +55,19 @@ export {
 /** InjectionKey для Imager-инстанса. */
 export const imagerKey: InjectionKey<Imager> = Symbol("imager");
 
-/** useInjectImager: возвращает Imager из контекста (или null). */
+/** Возвращает Imager из контекста. */
 export function useInjectImager(): Imager | null {
     return inject(imagerKey, null);
 }
 
-/** Плагин: app.use(ImagerPlugin, { baseURL, format, dpr }) — провайдер по умолчанию. */
+/** Плагин. */
 export const ImagerPlugin = {
     install(app: App, options?: ImagerOptions | null): void {
         app.provide(imagerKey, new Imager(options || {}));
     },
 };
 
-/** Провайдер: <ImagerProvider :imager="imager">...</ImagerProvider> */
+/** Провайдер. */
 export const ImagerProvider = defineComponent({
     name: "ImagerProvider",
     props: {
@@ -78,57 +82,72 @@ export const ImagerProvider = defineComponent({
     },
 });
 
-/** Record → Vue-атрибуты: true → пустая строка, false/null/undefined → пропуск. */
+/** Record → Vue-атрибуты: true → "", false/null/undefined → пропуск. */
 function toVueAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    for (const key of Object.keys(attrs)) {
+    const keys = Object.keys(attrs);
+
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
         const value = attrs[key];
+
         if (value === false || value === null || value === undefined) {
             continue;
         }
+
         out[key] = value === true ? "" : value;
     }
+
     return out;
 }
 
-/** Собирает img-атрибуты из группы путей. */
+/** Собирает атрибуты <img>. */
 function imgAttrs(
     paths: AssetPath[],
     extra: Record<string, unknown>,
     useWidth: boolean,
 ): Record<string, unknown> {
     const base = paths[0];
-    const attrs: Record<string, unknown> = {
-        src: base.path,
-        ...toVueAttrs(extra),
-    };
-    if (paths.length > 1) {
-        attrs.srcset = buildSrcset(paths, useWidth);
+    const attrs: Record<string, unknown> = { src: base.path };
+    const extraKeys = Object.keys(extra);
+
+    for (let i = 0; i < extraKeys.length; i++) {
+        const key = extraKeys[i];
+        const value = extra[key];
+
+        if (value === false || value === null || value === undefined) {
+            continue;
+        }
+
+        attrs[key] = value === true ? "" : value;
     }
-    // width/height для CLS из базового path — только если пользователь
-    // не задал свои (напрямую или через imgAttrs): без дублирования.
+
+    if (paths.length > 1) {
+        const srcset = buildSrcset(paths, useWidth);
+        if (srcset !== "") {
+            attrs.srcset = srcset;
+        }
+    }
+
     if (
         base.width !== undefined &&
         base.width > 0 &&
-        (extra["width"] === undefined || extra["width"] === null)
+        (extra.width === undefined || extra.width === null)
     ) {
         attrs.width = base.width;
     }
+
     if (
         base.height !== undefined &&
         base.height > 0 &&
-        (extra["height"] === undefined || extra["height"] === null)
+        (extra.height === undefined || extra.height === null)
     ) {
         attrs.height = base.height;
     }
+
     return attrs;
 }
 
-/** Базовые props для ImagerAssets/ImagerAsset.
-
-HTML-атрибуты объявлены явно, чтобы Vue не применял их автоматически
-к корневому элементу <picture> (fallthrough-поведение single-root).
-*/
 const baseProps = {
     imager: { type: Object as PropType<Imager | null>, default: null },
     src: { type: String, default: undefined },
@@ -141,142 +160,138 @@ const baseProps = {
     formats: { type: [String, Array] as PropType<string | string[] | undefined>, default: undefined },
     dpr: { type: [Number, String], default: undefined },
     dprs: { type: [Number, String], default: undefined },
-    // img-атрибуты
     alt: { type: String, default: undefined },
     sizes: { type: String, default: undefined },
     loading: { type: String, default: undefined },
     lazy: { type: Boolean, default: undefined },
     decoding: { type: String, default: undefined },
     fetchpriority: { type: String, default: undefined },
-    // явные img-атрибуты (приоритет над перенаправленными)
     imgAttrs: { type: Object as PropType<Record<string, unknown> | undefined>, default: undefined },
-    // picture-атрибуты
     class: { type: String, default: undefined },
     id: { type: String, default: undefined },
     style: { type: [String, Object], default: undefined },
 };
 
-/** Собирает HTML-атрибуты из props (alt, sizes, loading, lazy, decoding, fetchpriority, imgAttrs, class, id, style). */
-function htmlAttrsFromProps(props: Record<string, unknown>): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    for (const key of [
-        "alt",
-        "sizes",
-        "loading",
-        "lazy",
-        "decoding",
-        "fetchpriority",
-        "imgAttrs",
-        "class",
-        "id",
-        "style",
-    ]) {
-        if (props[key] !== undefined && props[key] !== null) {
-            out[key] = props[key];
-        }
-    }
-    return out;
+const HTML_ATTR_KEYS = [
+    "alt",
+    "sizes",
+    "loading",
+    "lazy",
+    "decoding",
+    "fetchpriority",
+    "imgAttrs",
+    "class",
+    "id",
+    "style",
+] as const;
+
+/** Нормализованные значения для вызова ядра. */
+function resolveCall(props: ImagerComponentProps) {
+    return normalizeProps(props, { include: HTML_ATTR_KEYS });
 }
 
-/** <picture> + <source> + <img> из GetAssets(). */
+/** <picture> + <source> + <img>. */
 export const ImagerAssets = defineComponent({
     name: "ImagerAssets",
     props: baseProps,
     setup(props) {
         const ctx = inject(imagerKey, null);
-        const inst = computed(() => (props.imager ? props.imager : ctx));
+
         return () => {
-            const imager = inst.value;
+            const imager = props.imager || ctx;
             if (!imager) {
                 return null;
             }
-            const call = normalizeProps({
-                source: props.source,
-                src: props.src,
-                segment: props.segment as never,
-                preset: props.preset,
-                width: props.width,
-                height: props.height,
-                format: props.format,
-                formats: props.formats,
-                dpr: props.dpr,
-                dprs: props.dprs,
-                ...htmlAttrsFromProps(props),
-            } as never);
-            const assets = imager.GetAssets(call.source, call.segments, call.formats, call.dprs);
+
+            const call = resolveCall(props as unknown as ImagerComponentProps);
+            const assets = imager.GetAssets(
+                call.source,
+                call.segments as never,
+                call.formats as never,
+                call.dprs as never,
+            );
+
             if (assets.length === 0) {
                 return null;
             }
-            const useWidth = useWidthDescriptors(call.options);
-            const { imgAttrs: imgA, picAttrs } = splitAttrs(call.options);
+
+            const options = call.options;
+            const useWidth = useWidthDescriptors(options);
+            const { imgAttrs: imgA, picAttrs } = splitAttrs(options);
             const groups = groupAssets(assets);
             const imgIndex = pickImgGroup(groups);
-            const imgPaths = groups[imgIndex].paths;
+            const imgGroup = groups[imgIndex];
+            const imgPaths = imgGroup.paths;
             const img = h("img", imgAttrs(imgPaths, imgA, useWidth));
 
             if (groups.length === 1) {
                 return img;
             }
 
-            const sources = groups
-                .map((group, i) => {
-                    if (i === imgIndex) {
-                        return null;
-                    }
-                    const sourceAttrs: Record<string, unknown> = { type: group.mime };
-                    if (group.paths.length > 1) {
-                        sourceAttrs.srcset = buildSrcset(group.paths, useWidth);
-                    } else {
-                        sourceAttrs.src = group.paths[0].path;
-                    }
-                    return h("source", sourceAttrs);
-                })
-                .filter((x) => x !== null);
+            const sources: ReturnType<typeof h>[] = [];
+
+            for (let i = 0; i < groups.length; i++) {
+                if (i === imgIndex) {
+                    continue;
+                }
+
+                const group = groups[i];
+                const srcset = buildSrcset(group.paths, useWidth);
+
+                if (srcset === "") {
+                    continue;
+                }
+
+                sources.push(
+                    h("source", {
+                        type: group.mime,
+                        srcset,
+                    }),
+                );
+            }
 
             return h("picture", toVueAttrs(picAttrs), [...sources, img]);
         };
     },
 });
 
-/** Один <img> из GetAsset(). */
+/** Один <img>. */
 export const ImagerAsset = defineComponent({
     name: "ImagerAsset",
     props: baseProps,
     setup(props) {
         const ctx = inject(imagerKey, null);
-        const inst = computed(() => (props.imager ? props.imager : ctx));
+
         return () => {
-            const imager = inst.value;
+            const imager = props.imager || ctx;
             if (!imager) {
                 return null;
             }
-            const call = normalizeProps({
-                source: props.source,
-                src: props.src,
-                segment: props.segment as never,
-                preset: props.preset,
-                width: props.width,
-                height: props.height,
-                format: props.format,
-                formats: props.formats,
-                dpr: props.dpr,
-                dprs: props.dprs,
-                ...htmlAttrsFromProps(props),
-            } as never);
+
+            const call = resolveCall(props as unknown as ImagerComponentProps);
             const asset = imager.GetAsset(
                 call.source,
                 call.segments as never,
                 call.formats as string,
                 call.dprs as number | string,
             );
+
             if (!asset) {
                 return null;
             }
+
             const useWidth = useWidthDescriptors(call.options);
             const { imgAttrs: imgA } = splitAttrs(call.options);
+
             return h("img", imgAttrs(asset.paths, imgA, useWidth));
         };
     },
 });
 
-export default { ImagerPlugin, ImagerProvider, ImagerAssets, ImagerAsset, useInjectImager };
+export default {
+    ImagerPlugin,
+    ImagerProvider,
+    ImagerAssets,
+    ImagerAsset,
+    useInjectImager,
+};

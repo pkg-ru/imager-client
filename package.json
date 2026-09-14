@@ -11,7 +11,7 @@
         "type": "git",
         "url": "https://github.com/pkg-ru/imager-client"
     },
-    "readme": "README.md",
+    "readme": "doc/TS-RU.md",
     "support": {
         "source": "https://gitverse.ru/pkg-ru/imager-client",
         "docs": "https://gitverse.ru/pkg-ru/imager-client/README.md"
@@ -53,8 +53,8 @@
     ],
     "scripts": {
         "build": "rollup -c rollup.config.js && tsc -p tsconfig.types.json",
-        "test": "tsc -p test/tsconfig.json && node test/dist/test/test.js",
-        "lint": "eslint src/imager-ts src/imager-ts-server test"
+        "test": "node node_modules/typescript/bin/tsc -p test/tsconfig.json && node test/dist/test/test.js",
+        "lint": "node node_modules/eslint/bin/eslint.js src/imager-ts src/imager-ts-server test packages/react/test packages/vue/test"
     },
     "devDependencies": {
         "@types/node": "^22.13.11",

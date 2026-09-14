@@ -1,16 +1,22 @@
+/*! @license
+ * @pkg-ru/imager-react — React-компоненты для микросервиса Imager
+ * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Автор: Vladislav Altukhov (https://altuh.ru/about)
+ * Демо: https://altuh.ru/demo/imager
+ */
 /** React-компоненты для микросервиса Imager.
-
-- ImagerPlugin — глобальная инициализация по умолчанию (как Vue ImagerPlugin);
-- ImagerProvider — React Context с Imager-инстансом (локальный, приоритетнее глобального);
-- ImagerAssets — <picture> + <source> + <img> из GetAssets();
-- ImagerAsset — один <img> из GetAsset().
-
-Пакет самодостаточен: ядро imager-client встроено (бандлится внутрь).
-Рендер — нативные React-узлы (без dangerouslySetInnerHTML).
-*/
+ *
+ * - ImagerPlugin — глобальная инициализация по умолчанию;
+ * - ImagerProvider — React Context;
+ * - ImagerAssets — <picture> + <source> + <img>;
+ * - ImagerAsset — один <img>.
+ *
+ * Пакет самодостаточен: ядро imager-client встроено.
+ * Рендер — нативные React-узлы.
+ */
 import * as React from "react";
 import { Imager, AssetPath, ImagerOptions } from "../../../src/imager-ts";
-import { normalizeProps, ImagerComponentProps } from "../../../src/imager-ts";
+import { ImagerComponentProps, normalizeProps } from "../../../src/imager-ts";
 import {
     buildSrcset,
     groupAssets,
@@ -19,8 +25,6 @@ import {
     useWidthDescriptors,
 } from "../../../src/imager-ts";
 
-// Re-export ядра: пакет самодостаточен, но можно использовать и свой инстанс
-// (например, ImagerServer с админ-методами) — типы совместимы.
 export {
     Imager,
     AssetPath,
@@ -43,7 +47,7 @@ export {
 
 const ImagerContext = React.createContext<Imager | null>(null);
 
-/** Глобальный инстанс по умолчанию (задаётся ImagerPlugin.install). */
+/** Глобальный инстанс по умолчанию. */
 let globalImager: Imager | null = null;
 
 /** Плагин: ImagerPlugin.install({ baseURL, format, dpr }) — глобальная инициализация.
@@ -77,19 +81,31 @@ export function ImagerProvider({
     options?: ImagerOptions | null;
     children?: React.ReactNode;
 }) {
-    const [inst] = React.useState<Imager | null>(() =>
-        imager !== undefined && imager !== null ? imager : options ? new Imager(options) : null,
+    const instRef = React.useRef<Imager | null>(null);
+
+    if (instRef.current === null) {
+        instRef.current =
+            imager !== undefined && imager !== null
+                ? imager
+                : options
+                  ? new Imager(options)
+                  : null;
+    }
+
+    return (
+        <ImagerContext.Provider value={instRef.current}>
+            {children}
+        </ImagerContext.Provider>
     );
-    return <ImagerContext.Provider value={inst}>{children}</ImagerContext.Provider>;
 }
 
-/** Возвращает Imager: из контекста (ImagerProvider) или глобального (ImagerPlugin). */
+/** Возвращает Imager: Provider → global. */
 export function useImager(): Imager | null {
     const ctx = React.useContext(ImagerContext);
     return ctx !== null ? ctx : globalImager;
 }
 
-/** HTML-имя атрибута → React-имя (class → className, for → htmlFor). */
+/** HTML-имя атрибута → React-имя. */
 function reactAttrName(name: string): string {
     if (name === "class") {
         return "className";
@@ -100,21 +116,26 @@ function reactAttrName(name: string): string {
     return name;
 }
 
-/** Record<string, unknown> → React-атрибуты (className, htmlFor и т.д.). */
+/** Record → React-атрибуты. */
 function toReactAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    for (const key of Object.keys(attrs)) {
+    const keys = Object.keys(attrs);
+
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
         const value = attrs[key];
+
         if (value === false || value === null || value === undefined) {
             continue;
         }
-        const name = reactAttrName(key);
-        out[name] = value === true ? "" : value;
+
+        out[reactAttrName(key)] = value === true ? "" : value;
     }
+
     return out;
 }
 
-/** Собирает <img> из группы путей (нативный React-узел). */
+/** Собирает <img>. */
 function buildImg(
     paths: AssetPath[],
     imgAttrs: Record<string, unknown>,
@@ -123,96 +144,187 @@ function buildImg(
     const base = paths[0];
     const attrs: Record<string, unknown> = {
         src: base.path,
-        ...toReactAttrs(imgAttrs),
     };
-    if (paths.length > 1) {
-        attrs.srcSet = buildSrcset(paths, useWidth);
+
+    const keys = Object.keys(imgAttrs);
+
+    for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const value = imgAttrs[key];
+
+        if (value === false || value === null || value === undefined) {
+            continue;
+        }
+
+        attrs[reactAttrName(key)] = value === true ? "" : value;
     }
-    // width/height для CLS из базового path — только если пользователь
-    // не задал свои (напрямую или через imgAttrs): без дублирования.
+
+    if (paths.length > 1) {
+        const srcset = buildSrcset(paths, useWidth);
+
+        if (srcset !== "") {
+            attrs.srcSet = srcset;
+        }
+    }
+
     if (
         base.width !== undefined &&
         base.width > 0 &&
-        (imgAttrs["width"] === undefined || imgAttrs["width"] === null)
+        (imgAttrs.width === undefined || imgAttrs.width === null)
     ) {
         attrs.width = base.width;
     }
+
     if (
         base.height !== undefined &&
         base.height > 0 &&
-        (imgAttrs["height"] === undefined || imgAttrs["height"] === null)
+        (imgAttrs.height === undefined || imgAttrs.height === null)
     ) {
         attrs.height = base.height;
     }
+
     return React.createElement("img", attrs);
 }
 
-/** <picture> + <source> + <img> из GetAssets(). */
+/** Белый список HTML-атрибутов, попадающих в options. */
+const HTML_ATTR_KEYS = [
+    "alt",
+    "sizes",
+    "loading",
+    "lazy",
+    "decoding",
+    "fetchpriority",
+    "imgAttrs",
+    "class",
+    "id",
+    "style",
+] as const;
+
+/** <picture> + <source> + <img>. */
 export function ImagerAssets({ imager, ...props }: { imager?: Imager | null } & ImagerComponentProps) {
     const ctx = useImager();
     const inst = imager !== undefined && imager !== null ? imager : ctx;
+
     if (inst === null) {
         return null;
     }
-    const call = normalizeProps(props);
-    const assets = inst.GetAssets(call.source, call.segments, call.formats, call.dprs);
+
+    const call = normalizeProps(props, { include: HTML_ATTR_KEYS });
+    const assets = inst.GetAssets(
+        call.source,
+        call.segments as never,
+        call.formats as never,
+        call.dprs as never,
+    );
+
     if (assets.length === 0) {
         return null;
     }
-    const useWidth = useWidthDescriptors(call.options);
-    const { imgAttrs, picAttrs } = splitAttrs(call.options);
+
+    const useWidth =
+        useWidthDescriptors(call.options);
+
+    const {
+        imgAttrs,
+        picAttrs,
+    } = splitAttrs(call.options);
+
     const groups = groupAssets(assets);
     const imgIndex = pickImgGroup(groups);
     const imgPaths = groups[imgIndex].paths;
-    const img = buildImg(imgPaths, imgAttrs, useWidth);
+    const img = buildImg(
+        imgPaths,
+        imgAttrs,
+        useWidth,
+    );
 
     if (groups.length === 1) {
         return img;
     }
 
     const sources: React.ReactElement[] = [];
+
     for (let i = 0; i < groups.length; i++) {
         if (i === imgIndex) {
             continue;
         }
+
         const group = groups[i];
-        const sourceAttrs: Record<string, unknown> = { type: group.mime };
-        if (group.paths.length > 1) {
-            sourceAttrs.srcSet = buildSrcset(group.paths, useWidth);
-        } else {
-            sourceAttrs.src = group.paths[0].path;
+        const srcset = buildSrcset(
+            group.paths,
+            useWidth,
+        );
+
+        if (srcset === "") {
+            continue;
         }
-        sources.push(React.createElement("source", sourceAttrs));
+
+        sources.push(
+            React.createElement(
+                "source",
+                {
+                    type: group.mime,
+                    srcSet: srcset,
+                },
+            ),
+        );
     }
+
+    const pictureAttrs =
+        toReactAttrs(picAttrs);
 
     return React.createElement(
         "picture",
-        toReactAttrs(picAttrs),
+        pictureAttrs,
         ...sources,
         img,
     );
 }
 
-/** Один <img> из GetAsset(). */
-export function ImagerAsset({ imager, ...props }: { imager?: Imager | null } & ImagerComponentProps) {
+/** Один <img>. */
+export function ImagerAsset({
+    imager,
+    ...props
+}: { imager?: Imager | null } & ImagerComponentProps) {
     const ctx = useImager();
-    const inst = imager !== undefined && imager !== null ? imager : ctx;
+    const inst =
+        imager !== undefined && imager !== null
+            ? imager
+            : ctx;
+
     if (inst === null) {
         return null;
     }
-    const call = normalizeProps(props);
+
+    const call = normalizeProps(props, { include: HTML_ATTR_KEYS });
     const asset = inst.GetAsset(
         call.source,
         call.segments as never,
         call.formats as string,
         call.dprs as number | string,
     );
+
     if (asset === null || asset === undefined) {
         return null;
     }
-    const useWidth = useWidthDescriptors(call.options);
-    const { imgAttrs } = splitAttrs(call.options);
-    return buildImg(asset.paths, imgAttrs, useWidth);
+
+    const useWidth =
+        useWidthDescriptors(call.options);
+
+    const { imgAttrs } =
+        splitAttrs(call.options);
+
+    return buildImg(
+        asset.paths,
+        imgAttrs,
+        useWidth,
+    );
 }
 
-export default { ImagerPlugin, ImagerProvider, ImagerAssets, ImagerAsset, useImager };
+export default {
+    ImagerPlugin,
+    ImagerProvider,
+    ImagerAssets,
+    ImagerAsset,
+    useImager,
+};

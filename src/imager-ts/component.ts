@@ -1,14 +1,11 @@
-/** Нормализация props фреймворк-компонентов (React/Vue/Twig).
+/*! @license
+ * imager-client — клиент микросервиса Imager
+ * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Автор: Vladislav Altukhov (https://altuh.ru/about)
+ * Демо: https://altuh.ru/demo/imager
+ */
+/** Нормализация props фреймворк-компонентов (React/Vue/Twig). */
 
-Единая логика алиасов для всех фреймворк-обёрток:
-- `src` → `source`;
-- `preset` → `segment` (строка-пресет);
-- `width`/`height` → сегмент-объект `{width, height}`;
-- `format`/`formats`, `dpr`/`dprs` — как в ядре;
-- остальные ключи — HTML-атрибуты (options для рендера).
-
-Приоритет сегмента: `segment` > `preset` > `width`/`height`.
-*/
 import { Segment } from "./ImagerTypes";
 
 /** Props компонента ImagerAssets/ImagerAsset. */
@@ -52,37 +49,84 @@ const RESERVED = new Set([
     "imager",
 ]);
 
-/** Разворачивает алиасы props в вызов ядра. */
-export function normalizeProps(props: ImagerComponentProps | null | undefined): NormalizedCall {
-    const p = props && typeof props === "object" ? props : {};
+/** Опции нормализации props. */
+export interface NormalizePropsOptions {
+    /** Белый список ключей для options. Если задан — в options попадают только эти ключи (с фильтрацией null/undefined). Если не задан — чёрный список RESERVED (текущее поведение). */
+    include?: readonly string[];
+}
 
-    const source = p.source !== undefined ? String(p.source) : p.src !== undefined ? String(p.src) : "";
+export function normalizeProps(
+    props: ImagerComponentProps | null | undefined,
+    opts?: NormalizePropsOptions,
+): NormalizedCall {
+    const p =
+        props && typeof props === "object"
+            ? props
+            : ({} as ImagerComponentProps);
 
-    // сегмент: segment > preset > width/height
+    const source =
+        p.source !== undefined
+            ? String(p.source)
+            : p.src !== undefined
+              ? String(p.src)
+              : "";
+
     let segments: Segment | Segment[] | null = null;
+
     if (p.segment !== undefined && p.segment !== null) {
-        segments = p.segment as Segment;
+        segments = p.segment;
     } else if (p.preset !== undefined && p.preset !== null) {
         segments = String(p.preset);
     } else if (p.width !== undefined || p.height !== undefined) {
-        const seg: { width?: number; height?: number } = {};
+        const segment: { width?: number; height?: number } = {};
+
         if (p.width !== undefined && p.width !== null) {
-            seg.width = Number(p.width);
+            segment.width = Number(p.width);
         }
+
         if (p.height !== undefined && p.height !== null) {
-            seg.height = Number(p.height);
+            segment.height = Number(p.height);
         }
-        segments = seg;
+
+        segments = segment;
     }
 
-    const formats = p.formats !== undefined ? p.formats : p.format !== undefined ? p.format : null;
-    const dprs = p.dprs !== undefined ? p.dprs : p.dpr !== undefined ? p.dpr : null;
+    const formats =
+        p.formats !== undefined
+            ? p.formats
+            : p.format !== undefined
+              ? p.format
+              : null;
 
-    // остаток — HTML-атрибуты
+    const dprs =
+        p.dprs !== undefined
+            ? p.dprs
+            : p.dpr !== undefined
+              ? p.dpr
+              : null;
+
     const options: Record<string, unknown> = {};
-    for (const key of Object.keys(p)) {
-        if (!RESERVED.has(key)) {
-            options[key] = p[key];
+
+    if (opts && opts.include) {
+        const include = opts.include;
+
+        for (let i = 0; i < include.length; i++) {
+            const key = include[i];
+            const value = p[key];
+
+            if (value !== undefined && value !== null) {
+                options[key] = value;
+            }
+        }
+    } else {
+        const keys = Object.keys(p);
+
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+
+            if (!RESERVED.has(key)) {
+                options[key] = p[key];
+            }
         }
     }
 

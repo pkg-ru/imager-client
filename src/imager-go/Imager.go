@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -295,6 +293,68 @@ func mimeFor(format string) string {
 //  Клиентские методы — без HTTP, без валидации, без исключений      //
 // ------------------------------------------------------------------ //
 
+// Нормализованный сегмент. Хранится один раз на вызов GetAssets.
+type normalizedSegment struct {
+	str    string
+	isSize bool
+	width  int
+	height int
+}
+
+// normalizeSegments избегает создания []any для common-case с одним сегментом.
+func normalizeSegments(segments any) (int, []normalizedSegment) {
+	switch t := segments.(type) {
+	case []any:
+		if len(t) == 0 {
+			return 0, nil
+		}
+		out := make([]normalizedSegment, len(t))
+		for n := range t {
+			s, isSize, w, h := normalizeSegment(t[n])
+			out[n] = normalizedSegment{str: s, isSize: isSize, width: w, height: h}
+		}
+		return len(out), out
+	default:
+		s, isSize, w, h := normalizeSegment(segments)
+		return 1, []normalizedSegment{{str: s, isSize: isSize, width: w, height: h}}
+	}
+}
+
+func formatsToList(formats any, defaults []string, defaultFormat, sourceFormat string) []string {
+	switch t := formats.(type) {
+	case string:
+		if t != "" {
+			return []string{t}
+		}
+	case []string:
+		if len(t) > 0 {
+			return t
+		}
+	}
+
+	if len(defaults) > 0 {
+		return defaults
+	}
+	if defaultFormat != "" {
+		return []string{defaultFormat}
+	}
+	if sourceFormat != "" {
+		return []string{sourceFormat}
+	}
+	return []string{""}
+}
+
+func dprSteps(dpr int) int {
+	switch dpr {
+	case 2:
+		return 2
+	case 3:
+		return 3
+	default:
+		return 1
+	}
+}
+
 // Один AssetType.
 func (i *Imager) GetAsset(source string, segment any, format string, dpr any) AssetType {
 	path, sourceName, sourceFormat := splitSource(source)
@@ -309,33 +369,25 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 	}
 
 	dprVal := i.resolveDpr(dpr)
-	explicit := dpr != nil
 
-	// --- Инварианты, вычисляемые ОДИН раз ---
 	prefix := i.urlPrefix(path, sourceName, sourceFormat)
-
-	// dpr — целевое значение: формирует ровно один вариант ассета
 	item := AssetPath{}
+
 	if dprVal >= 2 {
-		item.Path = prefix + segStr + "@" + strconv.Itoa(dprVal) + "." + outFormat
+		item.Path = prefix + segStr + dprSuffixes[dprVal] + "." + outFormat
 		item.Dpr = float64(dprVal)
+		if isSize {
+			if width > 0 {
+				item.Width = width * dprVal
+			}
+			if height > 0 {
+				item.Height = height * dprVal
+			}
+		}
 	} else {
 		item.Path = prefix + segStr + "." + outFormat
-		if explicit && dprVal == 1 {
-			item.Dpr = 1.0
-		}
-	}
-	if isSize && width > 0 {
-		if dprVal >= 2 {
-			item.Width = width * dprVal
-		} else {
+		if isSize {
 			item.Width = width
-		}
-	}
-	if isSize && height > 0 {
-		if dprVal >= 2 {
-			item.Height = height * dprVal
-		} else {
 			item.Height = height
 		}
 	}
@@ -360,136 +412,109 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 // ширина первого участника с известной шириной, dpr = фактическая
 // ширина / базовая (или по высоте, если ширины нет).
 func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) []AssetType {
-	// segments: не задан → [nil] → "x"
-	var segList []any
-	if segments == nil {
-		segList = []any{nil}
-	} else {
-		switch t := segments.(type) {
-		case []any:
-			segList = t
-		default:
-			segList = []any{segments}
-		}
-	}
-
-	// formats: аргумент → настройки formats → format → [исходный]
-	var fmtList []string
-	if formats != nil {
-		switch t := formats.(type) {
-		case string:
-			if t != "" {
-				fmtList = []string{t}
-			}
-		case []string:
-			fmtList = t
-		}
-	}
 	path, sourceName, sourceFormat := splitSource(source)
-	if len(fmtList) == 0 {
-		if len(i.Formats) > 0 {
-			fmtList = i.Formats
-		} else if i.Format != "" {
-			fmtList = []string{i.Format}
-		} else if sourceFormat != "" {
-			fmtList = []string{sourceFormat}
-		} else {
-			fmtList = []string{""}
-		}
-	}
 
-	dprVal := i.resolveDpr(dprs)
-	explicit := dprs != nil
-
-	// --- Инварианты, вычисляемые ОДИН раз на весь вызов ---
-	// 1. Префикс URL {baseURL}{path}/{name}-{srcfmt}/ — одинаков для всех путей.
-	prefix := i.urlPrefix(path, sourceName, sourceFormat)
-	// 2. Суффиксы dpr: [без суффикса, @2, @3] — константы.
-	maxSteps := 1
-	if dprVal == 2 {
-		maxSteps = 2
-	} else if dprVal >= 3 {
-		maxSteps = 3
-	}
-
-	// Пути всех сегментов по каждому формату (сегмент-мажорно).
+	// Форматы: аргумент → настройки formats → format → исходный формат.
+	fmtList := formatsToList(formats, i.Formats, i.Format, sourceFormat)
 	nFmt := len(fmtList)
-	pathsByFmt := make([][]AssetPath, nFmt)
-	for fi := range nFmt {
-		pathsByFmt[fi] = []AssetPath{}
-	}
-	for _, seg := range segList {
-		segStr, isSize, width, height := normalizeSegment(seg)
-		for fi := range nFmt {
-			eff := fmtList[fi]
-			if eff == "" {
-				eff = sourceFormat
-			}
-			for step := 1; step <= maxSteps; step++ {
-				item := AssetPath{
-					Path: prefix + segStr + dprSuffixes[step] + "." + eff,
-				}
-				if dprVal == 1 && explicit {
-					item.Dpr = 1.0
-				} else if step >= 2 {
-					item.Dpr = float64(step)
-				}
-				if isSize && width > 0 {
-					multiply := 1
-					if step >= 2 {
-						multiply = step
-					}
-					item.Width = width * multiply
-				}
-				if isSize && height > 0 {
-					multiply := 1
-					if step >= 2 {
-						multiply = step
-					}
-					item.Height = height * multiply
-				}
-				pathsByFmt[fi] = append(pathsByFmt[fi], item)
-			}
+
+	// Нормализуем сегменты ровно один раз и сразу определяем базовые размеры.
+	segCount, segs := normalizeSegments(segments)
+	maxSteps := dprSteps(i.resolveDpr(dprs))
+
+	baseWidth, baseHeight := 0, 0
+	for n := 0; n < segCount; n++ {
+		s := segs[n]
+		if baseWidth == 0 && s.width > 0 {
+			baseWidth = s.width
+		}
+		if baseHeight == 0 && s.height > 0 {
+			baseHeight = s.height
 		}
 	}
 
-	// dpr из фактических размеров: базовая ширина = ширина первого
-	// участника с известной шириной; dpr = фактическая ширина / базовая.
-	// Если ширины нет — по высоте; если ни того, ни другого — без dpr.
+	prefix := i.urlPrefix(path, sourceName, sourceFormat)
+	pathsPerFormat := segCount * maxSteps
+
 	result := make([]AssetType, nFmt)
-	for fi := range nFmt {
+	for fi := 0; fi < nFmt; fi++ {
 		eff := fmtList[fi]
 		if eff == "" {
 			eff = sourceFormat
 		}
-		paths := pathsByFmt[fi]
-		baseWidth, baseHeight := 0, 0
-		for j := range paths {
-			if baseWidth == 0 && paths[j].Width > 0 {
-				baseWidth = paths[j].Width
-			}
-			if baseHeight == 0 && paths[j].Height > 0 {
-				baseHeight = paths[j].Height
+
+		paths := make([]AssetPath, pathsPerFormat)
+		pos := 0
+		hasGt1 := false
+
+		for n := range segCount {
+			s := segs[n]
+
+			for step := 1; step <= maxSteps; step++ {
+				item := AssetPath{
+					Path: prefix + s.str + dprSuffixes[step] + "." + eff,
+				}
+				if step >= 2 {
+					item.Dpr = float64(step)
+				}
+
+				if s.isSize {
+					switch step {
+					case 1:
+						item.Width = s.width
+						item.Height = s.height
+					case 2:
+						item.Dpr = 2
+						item.Width = s.width * 2
+						item.Height = s.height * 2
+					default: // step == 3
+						item.Dpr = 3
+						item.Width = s.width * 3
+						item.Height = s.height * 3
+					}
+
+					// Полностью повторяет старую логику baseWidth → baseHeight.
+					var currentDpr float64
+					hasDpr := false
+					if baseWidth > 0 && item.Width > 0 {
+						currentDpr = float64(item.Width) / float64(baseWidth)
+						hasDpr = true
+					} else if baseHeight > 0 && item.Height > 0 {
+						currentDpr = float64(item.Height) / float64(baseHeight)
+						hasDpr = true
+					}
+					if hasDpr {
+						if currentDpr > 1 {
+							hasGt1 = true
+						}
+						item.Dpr = currentDpr
+					}
+				}
+
+				paths[pos] = item
+				pos++
 			}
 		}
-		for j := range paths {
-			if baseWidth > 0 && paths[j].Width > 0 {
-				paths[j].Dpr = float64(paths[j].Width) / float64(baseWidth)
-			} else if baseHeight > 0 && paths[j].Height > 0 {
-				paths[j].Dpr = float64(paths[j].Height) / float64(baseHeight)
+
+		// При единственном эффективном варианте 1x поле dpr не сериализуется.
+		if !hasGt1 {
+			for n := range paths {
+				if paths[n].Dpr == 1 {
+					paths[n].Dpr = 0
+				}
 			}
 		}
-		asset := AssetType{
+
+		result[fi] = AssetType{
 			Type:  mimeFor(eff),
 			Paths: paths,
 		}
 		if eff == sourceFormat {
-			asset.SourceFormat = boolPtr(true)
+			result[fi].SourceFormat = boolPtr(true)
 		}
 		if eff == "jpg" || eff == "jpeg" || eff == "gif" || eff == "png" {
-			asset.AllSupport = boolPtr(true)
+			result[fi].AllSupport = boolPtr(true)
 		}
-		result[fi] = asset
 	}
 
 	return result
@@ -508,12 +533,11 @@ func (i *Imager) GetAssetPath(source string, segment any, format string, dpr any
 		outFormat = sourceFormat
 	}
 
+	prefix := i.urlPrefix(path, sourceName, sourceFormat)
 	dprVal := i.resolveDpr(dpr)
 	if dprVal >= 2 {
-		segStr = segStr + "@" + strconv.Itoa(dprVal)
+		return prefix + segStr + dprSuffixes[dprVal] + "." + outFormat
 	}
-
-	prefix := i.urlPrefix(path, sourceName, sourceFormat)
 	return prefix + segStr + "." + outFormat
 }
 
@@ -521,16 +545,40 @@ func (i *Imager) GetAssetPath(source string, segment any, format string, dpr any
 //  HTML-генерация (GetAssetsHtml)                                    //
 // ------------------------------------------------------------------ //
 
-// Экранирование значения HTML-атрибута (как html.EscapeString для атрибутов).
+// Экранирование значения HTML-атрибута.
 func htmlEscape(value string) string {
-	r := strings.NewReplacer(
-		"&", "&am"+"p;",
-		"<", "&l"+"t;",
-		">", "&g"+"t;",
-		`"`, "&qu"+"ot;",
-		"'", "&#x"+"27;",
-	)
-	return r.Replace(value)
+	// Ручной escape быстрее strings.NewReplacer на коротких атрибутах
+	// и не создаёт объект Replacer на каждый вызов.
+	var b strings.Builder
+	last := 0
+	for idx := 0; idx < len(value); idx++ {
+		var repl string
+		switch value[idx] {
+		case '&':
+			repl = "&amp;"
+		case '<':
+			repl = "&lt;"
+		case '>':
+			repl = "&gt;"
+		case '"':
+			repl = "&quot;"
+		case '\'':
+			repl = "&#x27;"
+		default:
+			continue
+		}
+		if b.Cap() == 0 {
+			b.Grow(len(value) + 8)
+		}
+		b.WriteString(value[last:idx])
+		b.WriteString(repl)
+		last = idx + 1
+	}
+	if last == 0 {
+		return value
+	}
+	b.WriteString(value[last:])
+	return b.String()
 }
 
 // Число → строка дескриптора: 1 → "1", 1.5 → "1.5" (без хвостовых нулей).
@@ -545,64 +593,117 @@ func fmtDescriptor(value float64) string {
 }
 
 // srcset для списка путей одного типа.
-//
-// useWidth → w-дескрипторы по AssetPath.Width; иначе dpr-дескрипторы:
-// из AssetPath.Dpr, а если dpr нет — из отношения height (или width)
-// к базовому (первому) значению (дробные допустимы).
 func buildSrcset(paths []AssetPath, useWidth bool) string {
+	if len(paths) == 0 {
+		return ""
+	}
+
 	baseWidth, baseHeight := 0, 0
+	hasDpr := false
+	maxDpr := 0.0
+
 	for j := range paths {
-		if baseWidth == 0 && paths[j].Width > 0 {
-			baseWidth = paths[j].Width
+		item := &paths[j]
+		if baseWidth == 0 && item.Width > 0 {
+			baseWidth = item.Width
 		}
-		if baseHeight == 0 && paths[j].Height > 0 {
-			baseHeight = paths[j].Height
+		if baseHeight == 0 && item.Height > 0 {
+			baseHeight = item.Height
+		}
+		if item.Dpr > 0 {
+			hasDpr = true
 		}
 	}
-	parts := make([]string, 0, len(paths))
+
+	if !useWidth {
+		for j := range paths {
+			item := &paths[j]
+			if item.Width <= 0 && item.Height <= 0 {
+				continue
+			}
+
+			var dpr float64
+			switch {
+			case item.Dpr > 0:
+				dpr = item.Dpr
+			case item.Width > 0 && baseWidth > 0:
+				dpr = float64(item.Width) / float64(baseWidth)
+			case item.Height > 0 && baseHeight > 0:
+				dpr = float64(item.Height) / float64(baseHeight)
+			default:
+				continue
+			}
+			if dpr > maxDpr {
+				maxDpr = dpr
+			}
+		}
+	}
+
+	// Оценка ёмкости: URL + дескриптор, без промежуточного parts []string.
+	var b strings.Builder
+	first := true
+
+	appendPart := func(path, desc string) {
+		if !first {
+			b.WriteString(", ")
+		}
+		b.WriteString(path)
+		if desc != "" {
+			b.WriteByte(' ')
+			b.WriteString(desc)
+		}
+		first = false
+	}
+
 	for j := range paths {
 		item := paths[j]
+
+		if useWidth {
+			if item.Width <= 0 {
+				continue
+			}
+			appendPart(item.Path, strconv.Itoa(item.Width)+"w")
+			continue
+		}
+
 		var desc string
 		switch {
-		case useWidth && item.Width > 0:
-			desc = strconv.Itoa(item.Width) + "w"
-		case item.Dpr > 0:
-			desc = fmtDescriptor(float64(item.Dpr)) + "x"
+		case item.Dpr > 0 && (item.Width > 0 || item.Height > 0):
+			desc = fmtDescriptor(item.Dpr) + "x"
 		case baseHeight > 0 && item.Height > 0:
 			desc = fmtDescriptor(float64(item.Height)/float64(baseHeight)) + "x"
 		case baseWidth > 0 && item.Width > 0:
 			desc = fmtDescriptor(float64(item.Width)/float64(baseWidth)) + "x"
+		case item.Width <= 0 && item.Height <= 0:
+			dprStep := item.Dpr
+			if dprStep <= 0 {
+				dprStep = 1
+			}
+			if maxDpr > 0 {
+				desc = fmtDescriptor((maxDpr+1)*dprStep) + "x"
+			} else if hasDpr {
+				desc = fmtDescriptor(dprStep) + "x"
+			} else {
+				appendPart(item.Path, "")
+				continue
+			}
 		default:
 			desc = "1x"
 		}
-		parts = append(parts, item.Path+" "+desc)
+		appendPart(item.Path, desc)
 	}
-	return strings.Join(parts, ", ")
+
+	return b.String()
 }
 
 // Атрибуты, относящиеся к <img>, а не к <picture>.
-var imgAttrsSet = map[string]bool{
-	"alt": true, "sizes": true, "loading": true, "width": true, "height": true,
-	"decoding": true, "fetchpriority": true,
-}
-
-// Рендер атрибутов: true → имя без значения, false → пропуск, иначе "name=\"value\"".
-func renderAttrs(attrs [][2]any) string {
-	var b strings.Builder
-	for _, kv := range attrs {
-		name, _ := kv[0].(string)
-		switch v := kv[1].(type) {
-		case bool:
-			if v {
-				b.WriteString(" " + name)
-			}
-		case nil:
-			b.WriteString(" " + name)
-		default:
-			b.WriteString(" " + name + `="` + htmlEscape(fmt.Sprintf("%v", v)) + `"`)
-		}
+func isImgAttr(name string) bool {
+	switch name {
+	case "alt", "sizes", "loading", "width", "height", "decoding", "fetchpriority":
+		return true
+	default:
+		return false
 	}
-	return b.String()
 }
 
 // Группа путей одного типа (формата) для HTML-вывода.
@@ -614,9 +715,6 @@ type htmlGroup struct {
 }
 
 // HTML <picture>/<img> по декартову произведению segments × formats.
-//
-// options — HTML-атрибуты: class/id/... → <picture>,
-// alt/sizes/loading (lazy → loading="lazy") → <img>.
 func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs any, options map[string]any) string {
 	assets := i.GetAssets(source, segments, formats, dprs)
 	if len(assets) == 0 {
@@ -630,73 +728,96 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 		}
 	}
 
-	// lazy → loading="lazy"
-	imgOpts := make(map[string]any, len(options))
-	maps.Copy(imgOpts, options)
-	if lazy, ok := imgOpts["lazy"]; ok && truthy(lazy) {
-		if _, has := imgOpts["loading"]; !has || imgOpts["loading"] == nil {
-			imgOpts["loading"] = "lazy"
-		}
-	}
-	delete(imgOpts, "lazy")
+	// Собираем атрибуты напрямую. maps.Copy + delete + отдельный map explicit
+	// в горячем пути не нужны.
+	imgAttrs := make([][2]any, 0, len(options)+1)
+	picAttrs := make([][2]any, 0, len(options))
+	var explicit map[string]any
 
-	// явные img-атрибуты (приоритет над перенаправленными)
-	explicit := make(map[string]any, 0)
-	if v, ok := imgOpts["imgAttrs"]; ok && v != nil {
-		switch t := v.(type) {
-		case map[string]any:
-			maps.Copy(explicit, t)
-		}
+	lazyEnabled := false
+	if v, ok := options["lazy"]; ok {
+		lazyEnabled = truthy(v)
 	}
-	delete(imgOpts, "imgAttrs")
 
-	// Разделение атрибутов: img-атрибуты vs атрибуты <picture>
-	// (сортировка по имени — детерминированный порядок вывода)
-	keys := make([]string, 0, len(imgOpts))
-	for k := range imgOpts {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	var imgAttrs, picAttrs [][2]any
-	for _, k := range keys {
-		v := imgOpts[k]
-		if imgAttrsSet[k] {
+	for k, v := range options {
+		switch k {
+		case "lazy":
+			continue
+
+		case "imgAttrs":
+			if m, ok := v.(map[string]any); ok && len(m) > 0 {
+				if explicit == nil {
+					explicit = make(map[string]any, len(m))
+				}
+				for ek, ev := range m {
+					explicit[ek] = ev
+				}
+			}
+			continue
+
+		case "loading":
+			if v == nil && lazyEnabled {
+				imgAttrs = append(imgAttrs, [2]any{"loading", "lazy"})
+				continue
+			}
+		}
+
+		if isImgAttr(k) {
 			imgAttrs = append(imgAttrs, [2]any{k, v})
 		} else {
 			picAttrs = append(picAttrs, [2]any{k, v})
 		}
 	}
-	// merge: перенаправленные + явные (явные имеют приоритет)
-	for k, v := range explicit {
-		// удалить существующий ключ (если есть), затем добавить явный
-		var merged [][2]any
+
+	// lazy → loading="lazy", когда loading отсутствует.
+	if lazyEnabled {
+		if loading, exists := options["loading"]; !exists {
+			imgAttrs = append(imgAttrs, [2]any{"loading", "lazy"})
+		} else if loading == nil {
+			// Уже добавлен в ветке loading выше.
+		}
+	}
+
+	// Явные imgAttrs имеют приоритет. Удаляем дубли за один проход.
+	if len(explicit) > 0 {
+		merged := make([][2]any, 0, len(imgAttrs)+len(explicit))
 		for _, kv := range imgAttrs {
 			name, _ := kv[0].(string)
-			if name != k {
+			if _, override := explicit[name]; !override {
 				merged = append(merged, kv)
 			}
 		}
-		merged = append(merged, [2]any{k, v})
+		for k, v := range explicit {
+			merged = append(merged, [2]any{k, v})
+		}
 		imgAttrs = merged
 	}
-	// сортировка по имени — детерминированный порядок вывода (как в TS/Py/PHP)
-	sort.Slice(imgAttrs, func(a, b int) bool {
-		na, _ := imgAttrs[a][0].(string)
-		nb, _ := imgAttrs[b][0].(string)
-		return na < nb
-	})
 
-	// Группировка по типу (формату): пути всех сегментов одного формата
-	// объединяются в один srcset внутри одного <source>/<img>.
+	// Группировка по MIME. В отличие от прежнего map, порядок групп всегда
+	// совпадает с порядком assets. Форматов обычно мало; линейный поиск
+	// устраняет map/hash overhead из hot path.
 	groups := make([]htmlGroup, 0, len(assets))
-	byType := make(map[string]*htmlGroup, len(assets))
-	for _, asset := range assets {
-		g, ok := byType[asset.Type]
-		if !ok {
-			groups = append(groups, htmlGroup{mime: asset.Type})
-			g = &groups[len(groups)-1]
-			byType[asset.Type] = g
+	for ai := range assets {
+		asset := &assets[ai]
+		groupIdx := -1
+		for gi := range groups {
+			if groups[gi].mime == asset.Type {
+				groupIdx = gi
+				break
+			}
 		}
+
+		if groupIdx < 0 {
+			groups = append(groups, htmlGroup{
+				mime:         asset.Type,
+				sourceFormat: asset.SourceFormat != nil && *asset.SourceFormat,
+				allSupport:   asset.AllSupport != nil && *asset.AllSupport,
+				paths:        asset.Paths,
+			})
+			continue
+		}
+
+		g := &groups[groupIdx]
 		g.paths = append(g.paths, asset.Paths...)
 		if asset.SourceFormat != nil && *asset.SourceFormat {
 			g.sourceFormat = true
@@ -706,8 +827,6 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 		}
 	}
 
-	// Выбор группы для <img>:
-	// 1) source_format=true; 2) первая all_support=true; 3) последняя.
 	imgIdx := -1
 	for idx := range groups {
 		if groups[idx].sourceFormat {
@@ -728,45 +847,63 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 	}
 
 	imgPaths := groups[imgIdx].paths
+	if len(imgPaths) == 0 {
+		return ""
+	}
 	base := imgPaths[0]
 
-	// <img>
 	var img strings.Builder
-	img.WriteString(` src="` + htmlEscape(base.Path) + `"`)
-	if len(imgPaths) > 1 {
-		img.WriteString(` srcset="` + htmlEscape(buildSrcset(imgPaths, useWidth)) + `"`)
+	img.Grow(len(base.Path) + 128)
+	img.WriteString(` src="`)
+	img.WriteString(htmlEscape(base.Path))
+	img.WriteByte('"')
+
+	imgSrcset := buildSrcset(imgPaths, useWidth)
+	if len(imgPaths) > 1 && imgSrcset != "" {
+		img.WriteString(` srcset="`)
+		img.WriteString(htmlEscape(imgSrcset))
+		img.WriteByte('"')
 	}
-	for _, kv := range imgAttrs {
-		name, _ := kv[0].(string)
-		switch v := kv[1].(type) {
-		case bool:
-			if v {
-				img.WriteString(" " + name)
-			}
-		case nil:
-			img.WriteString(" " + name)
-		default:
-			img.WriteString(" " + name + `="` + htmlEscape(fmt.Sprintf("%v", v)) + `"`)
-		}
-	}
-	// width/height для CLS из базового path — только если пользователь
-	// не задал свои (напрямую или через imgAttrs): без дублирования.
+
 	hasWidth, hasHeight := false, false
 	for _, kv := range imgAttrs {
-		name, _ := kv[0].(string)
-		if name == "width" {
-			hasWidth = true
+		name := kv[0].(string)
+		switch v := kv[1].(type) {
+		case bool:
+			if !v {
+				continue
+			}
+			img.WriteByte(' ')
+			img.WriteString(name)
+		case nil:
+			img.WriteByte(' ')
+			img.WriteString(name)
+		default:
+			img.WriteByte(' ')
+			img.WriteString(name)
+			img.WriteString(`="`)
+			img.WriteString(htmlEscape(fmt.Sprintf("%v", v)))
+			img.WriteByte('"')
 		}
-		if name == "height" {
+		switch name {
+		case "width":
+			hasWidth = true
+		case "height":
 			hasHeight = true
 		}
 	}
+
 	if base.Width > 0 && !hasWidth {
-		img.WriteString(` width="` + strconv.Itoa(base.Width) + `"`)
+		img.WriteString(` width="`)
+		img.WriteString(strconv.Itoa(base.Width))
+		img.WriteByte('"')
 	}
 	if base.Height > 0 && !hasHeight {
-		img.WriteString(` height="` + strconv.Itoa(base.Height) + `"`)
+		img.WriteString(` height="`)
+		img.WriteString(strconv.Itoa(base.Height))
+		img.WriteByte('"')
 	}
+
 	imgHTML := "<img" + img.String() + ">"
 
 	if len(groups) == 1 {
@@ -774,20 +911,46 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 	}
 
 	var b strings.Builder
-	b.WriteString("<picture" + renderAttrs(picAttrs) + ">")
-	for idx, group := range groups {
+	b.Grow(len(imgHTML) + 64*len(groups))
+	b.WriteString("<picture")
+	for _, kv := range picAttrs {
+		name := kv[0].(string)
+		switch v := kv[1].(type) {
+		case bool:
+			if v {
+				b.WriteByte(' ')
+				b.WriteString(name)
+			}
+		case nil:
+			b.WriteByte(' ')
+			b.WriteString(name)
+		default:
+			b.WriteByte(' ')
+			b.WriteString(name)
+			b.WriteString(`="`)
+			b.WriteString(htmlEscape(fmt.Sprintf("%v", v)))
+			b.WriteByte('"')
+		}
+	}
+	b.WriteByte('>')
+
+	for idx := range groups {
 		if idx == imgIdx {
 			continue
 		}
-		b.WriteString("\n    " + `<source type="` + htmlEscape(group.mime) + `"`)
-		if len(group.paths) > 1 {
-			b.WriteString(` srcset="` + htmlEscape(buildSrcset(group.paths, useWidth)) + `"`)
-		} else {
-			b.WriteString(` src="` + htmlEscape(group.paths[0].Path) + `"`)
+		srcset := buildSrcset(groups[idx].paths, useWidth)
+		if srcset == "" {
+			continue
 		}
-		b.WriteString(">")
+		b.WriteString("<source type=\"")
+		b.WriteString(htmlEscape(groups[idx].mime))
+		b.WriteString(`" srcset="`)
+		b.WriteString(htmlEscape(srcset))
+		b.WriteString("\">")
 	}
-	b.WriteString("\n    " + imgHTML + "\n</picture>")
+
+	b.WriteString(imgHTML)
+	b.WriteString("</picture>")
 	return b.String()
 }
 

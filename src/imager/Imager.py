@@ -1,9 +1,7 @@
-"""Класс Imager — клиент микросервиса imager (Python-реализация).
+"""Класс Imager — высокопроизводительный клиент микросервиса imager.
 
-Клиентская часть (GetAsset/GetAssets/GetAssetPath) — чистое построение
-путей/URL без HTTP, без валидации и исключений, только конкатенация строк.
-Админ-часть (AdminGenerate/AdminDelete) — стандартный HTTP-клиент
-(urllib.request), результат — bool по маппингу кодов ответа.
+Клиентские методы не выполняют HTTP: только строят URL/структуры результатов.
+Админ-методы используют стандартный urllib.request.
 """
 from __future__ import annotations
 
@@ -12,11 +10,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional, Union
 
-from .ImagerTypes import (
-    AssetType,
-    ImagerOptions,
-    mime_for,
-)
+from .ImagerTypes import AssetType, ImagerOptions
 
 __all__ = ["Imager"]
 
@@ -43,31 +37,29 @@ class Imager:
         "_src_cache",
     )
 
+    _IMG_ATTRS = frozenset(
+        ("alt", "sizes", "loading", "width", "height", "decoding", "fetchpriority")
+    )
+    _MIME_JPG = "image/jpeg"
+
     def __init__(self, options: Optional[Union[ImagerOptions, dict]] = None) -> None:
         options = options if isinstance(options, dict) else {}
 
-        # token
         token = options.get("token")
         self._token = str(token) if token is not None else ""
 
-        # dpr
         dpr = options.get("dpr", 0)
         try:
             self._dpr = int(dpr) if dpr is not None else 0
         except (TypeError, ValueError):
             self._dpr = 0
 
-        # format / formats
         fmt = options.get("format")
         self._format = str(fmt) if fmt is not None else ""
 
         formats = options.get("formats")
-        if formats is None:
-            self._formats = []
-        else:
-            self._formats = [str(f) for f in formats]
+        self._formats = [] if formats is None else [str(f) for f in formats]
 
-        # baseURL — нормализация «…/» в конце
         base_url = options.get("baseURL")
         if base_url is None or base_url == "":
             self._baseURL = "/"
@@ -75,7 +67,6 @@ class Imager:
             base_url = str(base_url)
             self._baseURL = base_url if base_url.endswith("/") else base_url + "/"
 
-        # adminURL — без завершающего `/`
         admin_url = options.get("adminURL")
         if admin_url is None or admin_url == "":
             self._adminURL = ""
@@ -83,16 +74,11 @@ class Imager:
             admin_url = str(admin_url)
             self._adminURL = admin_url.rstrip("/") if admin_url.endswith("/") else admin_url
 
-        # одноэлементный кэш последнего source: (source, path, name, fmt, prefix)
+        # (source, path, source_name, source_format, prefix)
         self._src_cache = None
-
-    # ------------------------------------------------------------------ #
-    #  Разбор source: (path, source_name, source_format)    #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def _split_source(source: str) -> tuple:
-        """Отбрасывает ведущий `/`, отделяет path и расширение (в lower-case)."""
         if not isinstance(source, str):
             source = str(source)
         source = source.lstrip("/")
@@ -107,131 +93,103 @@ class Imager:
 
         last_dot = file.rfind(".")
         if last_dot >= 0:
-            source_name = file[:last_dot]
-            source_format = file[last_dot + 1:].lower()
-        else:
-            source_name = file
-            source_format = ""
-
-        return path, source_name, source_format
-
-    # ------------------------------------------------------------------ #
-    #  Формализация сегмента                                 #
-    # ------------------------------------------------------------------ #
+            return path, file[:last_dot], file[last_dot + 1:].lower()
+        return path, file, ""
 
     @staticmethod
     def _build_size(width: int, height: int) -> str:
-        """Сборка сегмента из размеров: 200x200 / 200x / x200 / x."""
         if width > 0:
             if height > 0:
-                return str(width) + "x" + str(height)
-            return str(width) + "x"
+                return f"{width}x{height}"
+            return f"{width}x"
         if height > 0:
-            return "x" + str(height)
+            return f"x{height}"
         return "x"
 
     @staticmethod
     def _parse_size_string(segment: str) -> tuple:
-        """→ (is_size, width, height) — один проход по строке."""
         idx = segment.find("x")
         if idx < 0:
             return False, 0, 0
         left = segment[:idx]
         right = segment[idx + 1:]
         if (left == "" or left.isdigit()) and (right == "" or right.isdigit()):
-            width = int(left) if left else 0
-            height = int(right) if right else 0
-            return True, width, height
+            return True, int(left) if left else 0, int(right) if right else 0
         return False, 0, 0
 
-    def _normalize_segment(self, segment: Optional[Any]) -> tuple:
-        """→ (segment_str, is_size, width, height)."""
+    @staticmethod
+    def _normalize_segment(segment: Optional[Any]) -> tuple:
         if segment is None:
             return "x", True, 0, 0
+
         if isinstance(segment, str):
-            is_size, width, height = self._parse_size_string(segment)
+            is_size, width, height = Imager._parse_size_string(segment)
             if is_size:
                 return segment, True, width, height
             return segment, False, 0, 0
+
         if isinstance(segment, dict):
-            width = 0
-            height = 0
-            if segment.get("width") is not None:
-                try:
-                    width = int(segment["width"])
-                except (TypeError, ValueError):
-                    width = 0
-            if segment.get("height") is not None:
-                try:
-                    height = int(segment["height"])
-                except (TypeError, ValueError):
-                    height = 0
-            return self._build_size(width, height), True, width, height
+            try:
+                raw_width = segment.get("width")
+                width = int(raw_width) if raw_width is not None else 0
+            except (TypeError, ValueError):
+                width = 0
+            try:
+                raw_height = segment.get("height")
+                height = int(raw_height) if raw_height is not None else 0
+            except (TypeError, ValueError):
+                height = 0
+            return Imager._build_size(width, height), True, width, height
+
         if isinstance(segment, (list, tuple)):
-            width = 0
-            height = 0
-            if len(segment) > 0 and segment[0] is not None:
-                try:
-                    width = int(segment[0])
-                except (TypeError, ValueError):
-                    width = 0
-            if len(segment) > 1 and segment[1] is not None:
-                try:
-                    height = int(segment[1])
-                except (TypeError, ValueError):
-                    height = 0
-            return self._build_size(width, height), True, width, height
-        # прочие типы → размер без размеров
+            try:
+                raw_width = segment[0] if len(segment) > 0 else None
+                width = int(raw_width) if raw_width is not None else 0
+            except (TypeError, ValueError):
+                width = 0
+            try:
+                raw_height = segment[1] if len(segment) > 1 else None
+                height = int(raw_height) if raw_height is not None else 0
+            except (TypeError, ValueError):
+                height = 0
+            return Imager._build_size(width, height), True, width, height
+
         return "x", True, 0, 0
 
     @staticmethod
     def _segment_to_string(segment: Optional[Any]) -> str:
-        """→ seg_str (только строка сегмента) — лёгкий путь для GetAssetPath.
-
-        Не разбирает width/height, если это не влияет на итоговую строку URL.
-        """
         if segment is None:
             return "x"
         if isinstance(segment, str):
             return segment
         if isinstance(segment, dict):
-            width = 0
-            height = 0
-            if segment.get("width") is not None:
-                try:
-                    width = int(segment["width"])
-                except (TypeError, ValueError):
-                    width = 0
-            if segment.get("height") is not None:
-                try:
-                    height = int(segment["height"])
-                except (TypeError, ValueError):
-                    height = 0
+            try:
+                raw_width = segment.get("width")
+                width = int(raw_width) if raw_width is not None else 0
+            except (TypeError, ValueError):
+                width = 0
+            try:
+                raw_height = segment.get("height")
+                height = int(raw_height) if raw_height is not None else 0
+            except (TypeError, ValueError):
+                height = 0
             return Imager._build_size(width, height)
         if isinstance(segment, (list, tuple)):
-            width = 0
-            height = 0
-            if len(segment) > 0 and segment[0] is not None:
-                try:
-                    width = int(segment[0])
-                except (TypeError, ValueError):
-                    width = 0
-            if len(segment) > 1 and segment[1] is not None:
-                try:
-                    height = int(segment[1])
-                except (TypeError, ValueError):
-                    height = 0
+            try:
+                raw_width = segment[0] if len(segment) > 0 else None
+                width = int(raw_width) if raw_width is not None else 0
+            except (TypeError, ValueError):
+                width = 0
+            try:
+                raw_height = segment[1] if len(segment) > 1 else None
+                height = int(raw_height) if raw_height is not None else 0
+            except (TypeError, ValueError):
+                height = 0
             return Imager._build_size(width, height)
-        # прочие типы → размер без размеров
         return "x"
-
-    # ------------------------------------------------------------------ #
-    #  dpr                                                   #
-    # ------------------------------------------------------------------ #
 
     @staticmethod
     def _parse_dpr(dpr: Any) -> int:
-        """Строка-цифра → число; < 1 → 0 (не используется); >3 → 3."""
         try:
             number = int(dpr)
         except (TypeError, ValueError):
@@ -242,142 +200,230 @@ class Imager:
             return 3
         return number
 
-    def _resolve_dpr(self, dpr: Optional[Union[int, str]]) -> int:
-        """Аргумент → настройки → 0."""
-        if dpr is not None:
-            return self._parse_dpr(dpr)
-        return self._parse_dpr(self._dpr)
 
-    # ------------------------------------------------------------------ #
-    #  Построение URL и списка paths                                     #
-    # ------------------------------------------------------------------ #
+    def _effective_format(fmt: str, source_format: str) -> str:
+        return fmt if fmt else source_format
 
-    def _url_prefix(self, path: str, source_name: str, source_format: str) -> str:
-        """{baseURL}{path}/{name}/ — общий префикс URL ассета."""
-        if source_format:
-            name = source_name + "-" + source_format
-        else:
-            name = source_name
-        if path:
-            return self._baseURL + path + "/" + name + "/"
-        return self._baseURL + name + "/"
 
-    def _build_url(self, path: str, source_name: str, source_format: str,
-                   segment: str, dpr: int, format: str) -> str:
-        """{baseURL}{path}/{name}-{srcfmt}/{segment}@{dpr}.{fmt}.
-
-        dpr — итоговое значение суффикса: 1 — без суффикса, 2-3 — `@2`/`@3`.
-        Если итоговый формат пуст — используется исходный (source_format).
-        """
-        if format:
-            out_format = format
-        else:
-            out_format = source_format
-
-        if dpr >= 2:
-            segment_part = segment + "@" + str(dpr)
-        else:
-            segment_part = segment
-
-        return self._url_prefix(path, source_name, source_format) + segment_part + "." + out_format
-
-    def _asset_path(self, prefix: str, seg_str: str, is_size: bool,
-                    width: int, height: int, dpr: int, explicit: bool,
-                    out_format: str) -> dict:
-        """Один path-объект для целевого dpr (GetAsset).
-
-        dpr — целевое значение, формирует ровно один вариант ассета:
-
-        - dpr < 1 (не используется) → без dpr-поля и суффикса;
-        - dpr == 1 и задан явно → без суффикса, с `dpr: 1`;
-        - dpr == 1 из настроек → без суффикса, без поля dpr;
-        - dpr >= 2 → суффикс `@dpr`, поле `dpr`, размеры умножены на dpr.
-        """
-        if dpr >= 2:
-            item: Dict[str, Any] = {
-                "path": prefix + seg_str + "@" + str(dpr) + "." + out_format,
-                "dpr": dpr,
-            }
+    def _append_path_item(
+        out: list,
+        prefix: str,
+        seg_str: str,
+        is_size: bool,
+        width: int,
+        height: int,
+        step: int,
+        out_format: str,
+        calculated_dpr: Optional[Union[int, float]] = None,
+        include_dpr_from_step: bool = False,
+    ) -> None:
+        if step >= 2:
+            path = prefix + seg_str + "@" + str(step) + "." + out_format
+            item: Dict[str, Any] = {"path": path, "dpr": step}
             if is_size and width > 0:
-                item["width"] = width * dpr
+                item["width"] = width * step
             if is_size and height > 0:
-                item["height"] = height * dpr
-            return item
-        item = {"path": prefix + seg_str + "." + out_format}
-        if explicit and dpr == 1:
-            item["dpr"] = 1
-        if is_size and width > 0:
-            item["width"] = width
-        if is_size and height > 0:
-            item["height"] = height
-        return item
-
-    def _asset_paths(self, prefix: str, seg_str: str, is_size: bool,
-                     width: int, height: int, dpr: int, explicit: bool,
-                     out_format: str) -> list:
-        """Список path-объектов от dpr=1 до итогового dpr.
-
-        prefix — уже готовый общий префикс URL (вычисляется один раз на вызов).
-        Специализированные ветки dpr вместо общего цикла (быстрее в hot path).
-
-        - dpr < 1 (не используется) → один объект без dpr-поля и суффикса;
-        - итоговый dpr == 1 и задан явно → один объект с `dpr: 1`;
-        - итоговый dpr == 1 из настроек → один объект без поля dpr;
-        - итоговый dpr == 2 → [без суффикса, @2 (dpr:2)];
-        - итоговый dpr >= 3 → [без суффикса, @2 (dpr:2), @3 (dpr:3)].
-
-        Поле `dpr` вписывается в варианты с суффиксом;
-        для размера width/height умножаются на шаг.
-        """
-        if dpr < 1:
-            item: Dict[str, Any] = {"path": prefix + seg_str + "." + out_format}
+                item["height"] = height * step
+        else:
+            path = prefix + seg_str + "." + out_format
+            item = {"path": path}
             if is_size and width > 0:
                 item["width"] = width
             if is_size and height > 0:
                 item["height"] = height
-            return [item]
-        if dpr == 1:
-            item = {"path": prefix + seg_str + "." + out_format}
-            if explicit:
-                item["dpr"] = 1
-            if is_size and width > 0:
-                item["width"] = width
-            if is_size and height > 0:
-                item["height"] = height
-            return [item]
-        if dpr == 2:
-            item1 = {"path": prefix + seg_str + "." + out_format}
-            if is_size and width > 0:
-                item1["width"] = width
-            if is_size and height > 0:
-                item1["height"] = height
-            item2 = {"path": prefix + seg_str + "@2." + out_format, "dpr": 2}
-            if is_size and width > 0:
-                item2["width"] = width * 2
-            if is_size and height > 0:
-                item2["height"] = height * 2
-            return [item1, item2]
-        # dpr >= 3
-        item1 = {"path": prefix + seg_str + "." + out_format}
-        if is_size and width > 0:
-            item1["width"] = width
-        if is_size and height > 0:
-            item1["height"] = height
-        item2 = {"path": prefix + seg_str + "@2." + out_format, "dpr": 2}
-        if is_size and width > 0:
-            item2["width"] = width * 2
-        if is_size and height > 0:
-            item2["height"] = height * 2
-        item3 = {"path": prefix + seg_str + "@3." + out_format, "dpr": 3}
-        if is_size and width > 0:
-            item3["width"] = width * 3
-        if is_size and height > 0:
-            item3["height"] = height * 3
-        return [item1, item2, item3]
 
-    # ------------------------------------------------------------------ #
-    #  Клиентские методы — без HTTP, без валидации, без исключений      #
-    # ------------------------------------------------------------------ #
+        if calculated_dpr is not None:
+            if calculated_dpr == int(calculated_dpr):
+                calculated_dpr = int(calculated_dpr)
+            if calculated_dpr == 1:
+                return
+            if step >= 2:
+                item["dpr"] = calculated_dpr
+            else:
+                item["dpr"] = calculated_dpr
+        out.append(item)
+
+    @staticmethod
+    def _format_input_formats(
+        formats: Optional[Any],
+        source_format: str,
+        default_format: str,
+        default_formats: list,
+    ) -> List[str]:
+        # Сохраняется семантика исходной реализации: пустой formats
+        # означает «использовать defaults», а не «вернуть []».
+        if formats is not None:
+            if isinstance(formats, str):
+                fmt_list = [formats] if formats != "" else []
+            else:
+                fmt_list = [str(f) for f in formats] if formats else []
+            if fmt_list:
+                return fmt_list
+
+        if default_formats:
+            return default_formats
+        if default_format:
+            return [default_format]
+        return [source_format] if source_format else [""]
+
+
+    @staticmethod
+    def _prepare_variants(
+        prefix: str,
+        seg_data: list,
+        dpr_val: int,
+        base_width: int,
+        base_height: int,
+    ) -> tuple:
+        """Вычисляет общие для всех форматов данные вариантов один раз.
+
+        Возвращает:
+            variants: [(path_stem, dpr_or_none, width, height), ...]
+            has_gt1: есть ли dpr > 1 в итоговой группе.
+        """
+        variants = []
+
+        if dpr_val <= 1:
+            calculated = []
+            has_gt1 = False
+
+            for seg_str, is_size, width, height in seg_data:
+                if width > 0 and base_width > 0:
+                    dpr = width / base_width
+                elif height > 0 and base_height > 0:
+                    dpr = height / base_height
+                else:
+                    dpr = 0
+
+                if dpr > 1:
+                    has_gt1 = True
+                if dpr and dpr == int(dpr):
+                    dpr = int(dpr)
+
+                item_width = width if is_size and width > 0 else 0
+                item_height = height if is_size and height > 0 else 0
+                stem = prefix + seg_str
+                calculated.append((stem, dpr or None, item_width, item_height))
+
+            if has_gt1:
+                return calculated, True
+            return [
+                (stem, None, width, height)
+                for stem, dpr, width, height in calculated
+            ], False
+
+        max_step = 2 if dpr_val == 2 else 3
+        for seg_str, is_size, width, height in seg_data:
+            stem_base = prefix + seg_str
+            for step in range(1, max_step + 1):
+                stem = (
+                    stem_base
+                    if step == 1
+                    else stem_base + "@" + str(step)
+                )
+
+                if step >= 2:
+                    if width > 0 and base_width > 0:
+                        dpr = (width / base_width) * step
+                    elif height > 0 and base_height > 0:
+                        dpr = (height / base_height) * step
+                    else:
+                        dpr = step
+                else:
+                    if width > 0 and base_width > 0:
+                        dpr = width / base_width
+                    elif height > 0 and base_height > 0:
+                        dpr = height / base_height
+                    else:
+                        dpr = 0
+
+                if dpr and dpr == int(dpr):
+                    dpr = int(dpr)
+
+                item_width = width * step if is_size and width > 0 else 0
+                item_height = height * step if is_size and height > 0 else 0
+                variants.append((stem, dpr or None, item_width, item_height))
+
+        has_gt1 = any(dpr is not None and dpr > 1 for _, dpr, _, _ in variants)
+        if not has_gt1:
+            variants = [
+                (stem, None if dpr == 1 else dpr, width, height)
+                for stem, dpr, width, height in variants
+            ]
+        return variants, has_gt1
+
+
+    def _build_assets(
+        self,
+        source: str,
+        segments: Optional[Any],
+        formats: Optional[Any],
+        dprs: Optional[Union[int, str]],
+    ) -> list:
+        cache = self._src_cache
+        if cache is not None and cache[0] == source:
+            source_format = cache[3]
+            prefix = cache[4]
+        else:
+            path, source_name, source_format = self._split_source(source)
+            if source_format:
+                name = source_name + "-" + source_format
+            else:
+                name = source_name
+            prefix = self._baseURL + path + "/" + name + "/" if path else self._baseURL + name + "/"
+            self._src_cache = (source, path, source_name, source_format, prefix)
+
+        if segments is None:
+            raw_segments = (None,)
+        elif isinstance(segments, list):
+            raw_segments = segments
+        else:
+            raw_segments = (segments,)
+
+        seg_data = [self._normalize_segment(seg) for seg in raw_segments]
+        fmt_list = self._format_input_formats(
+            formats, source_format, self._format, self._formats
+        )
+        dpr_val = self._parse_dpr(self._dpr if dprs is None else dprs)
+
+        base_width = 0
+        base_height = 0
+        for _, _, width, height in seg_data:
+            if base_width == 0 and width > 0:
+                base_width = width
+            if base_height == 0 and height > 0:
+                base_height = height
+
+        variants, has_gt1 = self._prepare_variants(
+            prefix, seg_data, dpr_val, base_width, base_height
+        )
+
+        result: list = []
+        for fmt in fmt_list:
+            eff = fmt if fmt else source_format
+            if eff == "jpg":
+                mime = self._MIME_JPG
+            else:
+                mime = "image/" + eff
+
+            paths = []
+            for stem, dpr, width, height in variants:
+                item = {"path": stem + "." + eff}
+                if dpr is not None:
+                    item["dpr"] = dpr
+                if width:
+                    item["width"] = width
+                if height:
+                    item["height"] = height
+                paths.append(item)
+
+            asset: AssetType = {"type": mime, "paths": paths}
+            if eff == source_format:
+                asset["source_format"] = True
+            if eff in ("jpg", "jpeg", "gif", "png"):
+                asset["all_support"] = True
+            result.append(asset)
+        return result
 
     def GetAsset(
         self,
@@ -386,24 +432,48 @@ class Imager:
         format: Optional[str] = None,
         dpr: Optional[Union[int, str]] = None,
     ) -> AssetType:
-        """Один AssetType."""
         cache = self._src_cache
         if cache is not None and cache[0] == source:
             source_format = cache[3]
             prefix = cache[4]
         else:
             path, source_name, source_format = self._split_source(source)
-            prefix = self._url_prefix(path, source_name, source_format)
+            if source_format:
+                name = source_name + "-" + source_format
+            else:
+                name = source_name
+            prefix = self._baseURL + path + "/" + name + "/" if path else self._baseURL + name + "/"
             self._src_cache = (source, path, source_name, source_format, prefix)
+
         seg_str, is_size, width, height = self._normalize_segment(segment)
-        out_format = format if (format is not None and format != "") else self._format
-        if out_format == "":
+        out_format = format if format else self._format
+        if not out_format:
             out_format = source_format
-        dpr_val = self._resolve_dpr(dpr)
-        explicit = dpr is not None
-        paths = [self._asset_path(prefix, seg_str, is_size, width, height,
-                                  dpr_val, explicit, out_format)]
-        result: AssetType = {"type": mime_for(out_format), "paths": paths}
+
+        dpr_val = self._parse_dpr(self._dpr if dpr is None else dpr)
+
+        if dpr_val >= 2:
+            item: Dict[str, Any] = {
+                "path": prefix + seg_str + "@" + str(dpr_val) + "." + out_format,
+                "dpr": dpr_val,
+            }
+            if is_size and width > 0:
+                item["width"] = width * dpr_val
+            if is_size and height > 0:
+                item["height"] = height * dpr_val
+        else:
+            item = {"path": prefix + seg_str + "." + out_format}
+            if is_size and width > 0:
+                item["width"] = width
+            if is_size and height > 0:
+                item["height"] = height
+
+        if out_format == "jpg":
+            mime = self._MIME_JPG
+        else:
+            mime = "image/" + out_format
+
+        result: AssetType = {"type": mime, "paths": [item]}
         if out_format == source_format:
             result["source_format"] = True
         if out_format in ("jpg", "jpeg", "gif", "png"):
@@ -417,181 +487,309 @@ class Imager:
         formats: Optional[Any] = None,
         dprs: Optional[Union[int, str]] = None,
     ) -> List[AssetType]:
-        """Один AssetType на формат; paths — все сегменты × dpr-шаги.
-
-        Порядок paths — сегмент-мажорный: для каждого сегмента все
-        dpr-шаги подряд. dpr вычисляется из фактических размеров:
-        базовая ширина = ширина первого участника с известной шириной,
-        dpr = фактическая ширина / базовая (или по высоте, если ширины нет).
-        """
-        # segments: не задан → [None] → "x"
-        if segments is None:
-            seg_list: list = [None]
-        elif isinstance(segments, list):
-            seg_list = segments
-        else:
-            seg_list = [segments]
-
-        # formats: аргумент → настройки formats → format → [исходный]
-        fmt_list: List[str] = []
-        if formats is not None:
-            if isinstance(formats, str):
-                fmt_list = [formats] if formats != "" else []
-            else:
-                fmt_list = [str(f) for f in formats] if formats else []
-
-        # source разбирается один раз; prefix строится один раз на вызов
-        cache = self._src_cache
-        if cache is not None and cache[0] == source:
-            source_format = cache[3]
-            prefix = cache[4]
-        else:
-            path, source_name, source_format = self._split_source(source)
-            prefix = self._url_prefix(path, source_name, source_format)
-            self._src_cache = (source, path, source_name, source_format, prefix)
-
-        if not fmt_list:
-            if self._formats:
-                fmt_list = list(self._formats)
-            elif self._format:
-                fmt_list = [self._format]
-            else:
-                fmt_list = [source_format] if source_format else [""]
-
-        dpr_val = self._resolve_dpr(dprs)
-        explicit = dprs is not None
-
-        # segments нормализуются один раз на элемент
-        seg_data = []
-        for seg in seg_list:
-            seg_data.append(self._normalize_segment(seg))
-
-        # formats подготавливаются один раз: (effective_format, mime)
-        fmt_data = []
-        for fmt in fmt_list:
-            eff = fmt if fmt != "" else source_format
-            fmt_data.append((eff, mime_for(eff)))
-
-        # Пути всех сегментов по каждому формату (сегмент-мажорно).
-        paths_by_fmt: List[List[dict]] = [[] for _ in fmt_data]
-        for seg_str, is_size, width, height in seg_data:
-            for fi, (eff, _mime) in enumerate(fmt_data):
-                seg_paths = self._asset_paths(prefix, seg_str, is_size, width, height,
-                                              dpr_val, explicit, eff)
-                paths_by_fmt[fi].extend(seg_paths)
-
-        # dpr из фактических размеров: базовая ширина = ширина первого
-        # участника с известной шириной; dpr = фактическая ширина / базовая.
-        # Если ширины нет — по высоте; если ни того, ни другого — без dpr.
-        # Целый результат → int (для единой JSON-сериализации с TS).
-        # Порядок ключей: path, dpr, width, height (для golden-тестов).
-        result: List[AssetType] = []
-        for fi, (eff, mime) in enumerate(fmt_data):
-            paths = paths_by_fmt[fi]
-            base_width = 0
-            base_height = 0
-            for item in paths:
-                if base_width == 0 and item.get("width", 0) > 0:
-                    base_width = item["width"]
-                if base_height == 0 and item.get("height", 0) > 0:
-                    base_height = item["height"]
-            for idx, item in enumerate(paths):
-                dpr = None
-                if base_width > 0 and item.get("width", 0) > 0:
-                    dpr = item["width"] / base_width
-                elif base_height > 0 and item.get("height", 0) > 0:
-                    dpr = item["height"] / base_height
-                if dpr is None:
-                    continue
-                if dpr == int(dpr):
-                    dpr = int(dpr)
-                rebuilt: Dict[str, Any] = {"path": item["path"], "dpr": dpr}
-                if item.get("width") is not None:
-                    rebuilt["width"] = item["width"]
-                if item.get("height") is not None:
-                    rebuilt["height"] = item["height"]
-                paths[idx] = rebuilt
-            asset: AssetType = {"type": mime, "paths": paths}
-            if eff == source_format:
-                asset["source_format"] = True
-            if eff in ("jpg", "jpeg", "gif", "png"):
-                asset["all_support"] = True
-            result.append(asset)
-        return result
-
-    # ------------------------------------------------------------------ #
-    #  HTML-генерация (GetAssetsHtml)                                    #
-    # ------------------------------------------------------------------ #
-
-    #: атрибуты, относящиеся к <img>, а не к <picture>
-    _IMG_ATTRS = frozenset(
-        ("alt", "sizes", "loading", "width", "height", "decoding", "fetchpriority")
-    )
+        return self._build_assets(source, segments, formats, dprs)
 
     @staticmethod
     def _html_escape(value: str) -> str:
-        """Экранирование значения атрибута (как html.escape(quote=True))."""
-        value = str(value)
-        value = value.replace("&", "&" + "amp;")
-        value = value.replace("<", "&" + "lt;")
-        value = value.replace(">", "&" + "gt;")
-        value = value.replace('"', "&" + "quot;")
-        value = value.replace("'", "&" + "#x27;")
-        return value
+        return str(value).translate({
+            38: "&amp;",   # &
+            60: "&lt;",    # <
+            62: "&gt;",    # >
+            34: "&quot;",  # "
+            39: "&#x27;",  # '
+        })
 
     @staticmethod
     def _fmt_dpr(value: Union[int, float]) -> str:
-        """Число → строка дескриптора: 1 → "1", 1.5 → "1.5" (без хвостовых нулей)."""
         if isinstance(value, int):
             return str(value)
         if value == int(value):
             return str(int(value))
         return repr(round(value, 2)).rstrip("0").rstrip(".")
 
-    def _build_srcset(self, paths: List[AssetPath], use_width: bool) -> str:
-        """srcset для списка путей одного типа.
+    def _build_srcset(self, paths: List[dict], use_width: bool) -> str:
+        if use_width:
+            return ", ".join(
+                item["path"] + " " + str(item["width"]) + "w"
+                for item in paths
+                if item.get("width")
+            )
 
-        use_width=True → w-дескрипторы по AssetPath.width (200w, 400w, ...);
-        иначе → dpr-дескрипторы: из AssetPath.dpr, а если dpr нет — dpr
-        вычисляется из отношения height (или width) к базовому (первому)
-        значению (дробные допустимы, напр. 1.5x).
-        """
         base_width = 0
         base_height = 0
+        max_dpr = 0.0
+        has_dpr = False
+
         for item in paths:
-            if base_width == 0 and item.get("width"):
-                base_width = item["width"]
-            if base_height == 0 and item.get("height"):
-                base_height = item["height"]
+            width = item.get("width")
+            height = item.get("height")
+            dpr = item.get("dpr")
+
+            if base_width == 0 and width:
+                base_width = width
+            if base_height == 0 and height:
+                base_height = height
+            if dpr:
+                has_dpr = True
+
+        for item in paths:
+            if not item.get("width") and not item.get("height"):
+                continue
+            dpr = item.get("dpr")
+            if dpr:
+                if dpr > max_dpr:
+                    max_dpr = dpr
+            elif item.get("width") and base_width > 0:
+                value = item["width"] / base_width
+                if value > max_dpr:
+                    max_dpr = value
+            elif item.get("height") and base_height > 0:
+                value = item["height"] / base_height
+                if value > max_dpr:
+                    max_dpr = value
+
         parts = []
+        if not paths:
+            return ""
+
         for item in paths:
             path = item["path"]
-            if use_width and item.get("width"):
-                desc = str(item["width"]) + "w"
-            elif item.get("dpr"):
-                desc = self._fmt_dpr(item["dpr"]) + "x"
-            elif base_height > 0 and item.get("height"):
-                desc = self._fmt_dpr(round(item["height"] / base_height, 2)) + "x"
-            elif base_width > 0 and item.get("width"):
-                desc = self._fmt_dpr(round(item["width"] / base_width, 2)) + "x"
+            width = item.get("width")
+            height = item.get("height")
+            dpr = item.get("dpr")
+
+            if dpr and (width or height):
+                desc = self._fmt_dpr(dpr) + "x"
+            elif height and base_height > 0:
+                desc = self._fmt_dpr(round(height / base_height, 2)) + "x"
+            elif width and base_width > 0:
+                desc = self._fmt_dpr(round(width / base_width, 2)) + "x"
+            elif not width and not height:
+                dpr_step = dpr or 1
+                if max_dpr > 0:
+                    desc = self._fmt_dpr(round((max_dpr + 1) * dpr_step, 2)) + "x"
+                elif has_dpr:
+                    desc = self._fmt_dpr(dpr_step) + "x"
+                else:
+                    parts.append(path)
+                    continue
             else:
                 desc = "1x"
+
             parts.append(path + " " + desc)
         return ", ".join(parts)
 
     def _render_attrs(self, attrs: List[tuple]) -> str:
-        """Список (имя, значение|None) → строка атрибутов с ведущим пробелом."""
-        chunks = []
+        parts = []
+        escape = self._html_escape
         for name, value in attrs:
-            if value is None:
-                chunks.append(" " + name)
-            elif value is True:
-                chunks.append(" " + name)
+            if value is None or value is True:
+                parts.append(" " + name)
             elif value is False:
                 continue
             else:
-                chunks.append(" " + name + '="' + self._html_escape(str(value)) + '"')
-        return "".join(chunks)
+                parts.append(" " + name + '="' + escape(value) + '"')
+        return "".join(parts)
+
+    def _prepare_html_attrs(self, options: dict) -> tuple:
+        use_width = "sizes" in options and options.get("sizes") is not None
+
+        img_opts = dict(options)
+        if img_opts.get("lazy"):
+            img_opts["loading"] = img_opts.get("loading") or "lazy"
+        img_opts.pop("lazy", None)
+
+        explicit = img_opts.get("imgAttrs")
+        if not isinstance(explicit, dict):
+            explicit = {}
+        img_opts.pop("imgAttrs", None)
+
+        img_keys = self._IMG_ATTRS
+        img_attrs = []
+        pic_attrs = []
+        for key, value in img_opts.items():
+            (img_attrs if key in img_keys else pic_attrs).append((key, value))
+
+        if explicit:
+            explicit_keys = set(explicit)
+            img_attrs = [item for item in img_attrs if item[0] not in explicit_keys]
+            img_attrs.extend(explicit.items())
+
+        return use_width, img_attrs, pic_attrs
+
+    def _build_html_groups_fast(
+        self,
+        source: str,
+        segments: Optional[Any],
+        formats: Optional[Any],
+        dprs: Optional[Union[int, str]],
+        use_width: bool,
+    ) -> list:
+        """Готовит только данные, необходимые для HTML, без AssetType/paths-объектов."""
+        cache = self._src_cache
+        if cache is not None and cache[0] == source:
+            source_format = cache[3]
+            prefix = cache[4]
+        else:
+            path, source_name, source_format = self._split_source(source)
+            if source_format:
+                name = source_name + "-" + source_format
+            else:
+                name = source_name
+            prefix = self._baseURL + path + "/" + name + "/" if path else self._baseURL + name + "/"
+            self._src_cache = (source, path, source_name, source_format, prefix)
+
+        if segments is None:
+            raw_segments = (None,)
+        elif isinstance(segments, list):
+            raw_segments = segments
+        else:
+            raw_segments = (segments,)
+
+        seg_data = [self._normalize_segment(seg) for seg in raw_segments]
+        fmt_list = self._format_input_formats(
+            formats, source_format, self._format, self._formats
+        )
+        dpr_val = self._parse_dpr(self._dpr if dprs is None else dprs)
+
+        base_width = 0
+        base_height = 0
+        for _, _, width, height in seg_data:
+            if base_width == 0 and width > 0:
+                base_width = width
+            if base_height == 0 and height > 0:
+                base_height = height
+
+        # Коэффициент размера сегмента относительно первого размерного сегмента.
+        ratios = []
+        has_gt1 = False
+        max_dpr = 0.0
+
+        for _, _, width, height in seg_data:
+            if width > 0 and base_width > 0:
+                ratio = width / base_width
+            elif height > 0 and base_height > 0:
+                ratio = height / base_height
+            else:
+                ratio = 0
+
+            ratios.append(ratio)
+            if ratio > 1:
+                has_gt1 = True
+
+            if dpr_val >= 2:
+                candidate = ratio * dpr_val if ratio else 0
+                if candidate > max_dpr:
+                    max_dpr = candidate
+            elif ratio > max_dpr:
+                max_dpr = ratio
+
+        groups = []
+        by_type = {}
+        has_dpr = dpr_val >= 2 or has_gt1
+
+        for fmt in fmt_list:
+            eff = fmt if fmt else source_format
+            mime = self._MIME_JPG if eff == "jpg" else "image/" + eff
+
+            group = by_type.get(mime)
+            if group is None:
+                group = {
+                    "type": mime,
+                    "src": "",
+                    "srcset": "",
+                    "source_format": False,
+                    "all_support": False,
+                    "width": 0,
+                    "height": 0,
+                    "path_count": 0,
+                }
+                by_type[mime] = group
+                groups.append(group)
+
+            srcset_parts = []
+            first_path = True
+            first_width = 0
+            first_height = 0
+
+            # dpr >= 2 always has dpr steps. For <= 1, dpr is derived
+            # from segment size ratios exactly as in GetAssets.
+            steps = 1 if dpr_val <= 1 else (2 if dpr_val == 2 else 3)
+
+            for seg_idx, (seg_str, is_size, width, height) in enumerate(seg_data):
+                ratio = ratios[seg_idx]
+
+                for step in range(1, steps + 1):
+                    if step == 1:
+                        path = prefix + seg_str + "." + eff
+                    else:
+                        path = (
+                            prefix + seg_str + "@" + str(step) + "." + eff
+                        )
+
+                    item_width = width * step if is_size and width > 0 else 0
+                    item_height = height * step if is_size and height > 0 else 0
+
+                    if first_path:
+                        group["src"] = path
+                        group["width"] = item_width
+                        group["height"] = item_height
+                        first_width = item_width
+                        first_height = item_height
+                        first_path = False
+
+                    if use_width:
+                        if item_width:
+                            srcset_parts.append(
+                                path + " " + str(item_width) + "w"
+                            )
+                        continue
+
+                    # Полное соответствие логике _build_srcset.
+                    if step >= 2:
+                        item_dpr = ratio * step if ratio else step
+                    elif ratio:
+                        item_dpr = ratio if has_gt1 else 0
+                    else:
+                        item_dpr = 0
+
+                    if item_dpr:
+                        if item_dpr == int(item_dpr):
+                            item_dpr = int(item_dpr)
+
+                    if item_dpr and (item_width or item_height):
+                        desc = self._fmt_dpr(item_dpr) + "x"
+                    elif item_height and base_height > 0:
+                        desc = self._fmt_dpr(
+                            round(item_height / base_height, 2)
+                        ) + "x"
+                    elif item_width and base_width > 0:
+                        desc = self._fmt_dpr(
+                            round(item_width / base_width, 2)
+                        ) + "x"
+                    else:
+                        # x-путь: для dpr>=2 item_dpr уже равен step.
+                        dpr_step = item_dpr or 1
+                        if max_dpr > 0:
+                            desc = self._fmt_dpr(
+                                round((max_dpr + 1) * dpr_step, 2)
+                            ) + "x"
+                        elif has_dpr:
+                            desc = self._fmt_dpr(dpr_step) + "x"
+                        else:
+                            srcset_parts.append(path)
+                            continue
+
+                    srcset_parts.append(path + " " + desc)
+
+            group["srcset"] = ", ".join(srcset_parts)
+            group["path_count"] = len(seg_data) * steps
+            if eff == source_format:
+                group["source_format"] = True
+            if eff in ("jpg", "jpeg", "gif", "png"):
+                group["all_support"] = True
+
+        return groups
 
     def GetAssetsHtml(
         self,
@@ -601,127 +799,79 @@ class Imager:
         dprs: Optional[Union[int, str]] = None,
         options: Optional[dict] = None,
     ) -> str:
-        """HTML <picture>/<img> по декартову произведению segments × formats.
-
-        options — HTML-атрибуты: class/id/... → <picture>,
-        alt/sizes/loading (lazy → loading="lazy") → <img>.
-        """
-        assets = self.GetAssets(source, segments, formats, dprs)
-        if not assets:
-            return ""
-
         options = options if isinstance(options, dict) else {}
         use_width = "sizes" in options and options.get("sizes") is not None
 
-        # lazy → loading="lazy"
-        img_opts = dict(options)
-        if img_opts.get("lazy"):
-            img_opts["loading"] = img_opts.get("loading") or "lazy"
-        img_opts.pop("lazy", None)
+        groups = self._build_html_groups_fast(
+            source, segments, formats, dprs, use_width
+        )
+        if not groups:
+            return ""
 
-        # явные img-атрибуты (приоритет над перенаправленными)
-        explicit = img_opts.get("imgAttrs")
-        if not isinstance(explicit, dict):
-            explicit = {}
-        img_opts.pop("imgAttrs", None)
+        use_width, img_attrs, pic_attrs = self._prepare_html_attrs(options)
 
-        # Разделение атрибутов: img-атрибуты vs атрибуты <picture>
-        # (сортировка по имени — детерминированный порядок вывода)
-        img_attrs = []
-        pic_attrs = []
-        for key, value in sorted(img_opts.items()):
-            if key in self._IMG_ATTRS:
-                img_attrs.append((key, value))
-            else:
-                pic_attrs.append((key, value))
-        # merge: перенаправленные + явные (явные имеют приоритет)
-        for key, value in sorted(explicit.items()):
-            img_attrs = [(k, v) for k, v in img_attrs if k != key]
-            img_attrs.append((key, value))
-
-        # Группировка по типу (формату): пути всех сегментов одного формата
-        # объединяются в один srcset внутри одного <source>/<img>.
-        groups = []          # список dict(type, paths, source_format, all_support)
-        by_type = {}         # mime → группа
-        for asset in assets:
-            mime = asset["type"]
-            group = by_type.get(mime)
-            if group is None:
-                group = {
-                    "type": mime,
-                    "paths": [],
-                    "source_format": False,
-                    "all_support": False,
-                }
-                by_type[mime] = group
-                groups.append(group)
-            group["paths"].extend(asset["paths"])
-            if asset.get("source_format"):
-                group["source_format"] = True
-            if asset.get("all_support"):
-                group["all_support"] = True
-
-        # Выбор группы для <img>:
-        # 1) source_format=true; 2) первый all_support=true; 3) последняя.
         img_group = None
-        for group in groups:
+        img_index = -1
+        for idx, group in enumerate(groups):
             if group["source_format"]:
                 img_group = group
+                img_index = idx
                 break
+
         if img_group is None:
-            for group in groups:
+            for idx, group in enumerate(groups):
                 if group["all_support"]:
                     img_group = group
+                    img_index = idx
                     break
+
         if img_group is None:
-            img_group = groups[-1]
-        img_index = groups.index(img_group)
-        sources = [g for i, g in enumerate(groups) if i != img_index]
+            img_index = len(groups) - 1
+            img_group = groups[img_index]
 
-        # Базовый path (первый, без dpr-суффикса) для src и width/height CLS
-        base = img_group["paths"][0]
+        if img_group["path_count"] == 0:
+            # Исходный GetAssetsHtml обращался к paths[0] и в этом случае
+            # выбрасывал IndexError.
+            raise IndexError("list index out of range")
 
-        img_attr_chunks = []
-        img_attr_chunks.append(" src=" + '"' + self._html_escape(base["path"]) + '"')
-        if len(img_group["paths"]) > 1:
-            img_attr_chunks.append(
-                " srcset=" + '"' + self._html_escape(self._build_srcset(img_group["paths"], use_width)) + '"'
-            )
+        escape = self._html_escape
+        img_parts = ['<img src="', escape(img_group["src"]), '"']
+
+        if img_group["path_count"] > 1 and img_group["srcset"]:
+            img_parts.extend((' srcset="', escape(img_group["srcset"]), '"'))
+
+        img_attr_names = set()
         for name, value in img_attrs:
+            img_attr_names.add(name)
             if value is None or value is True:
-                img_attr_chunks.append(" " + name)
+                img_parts.append(" " + name)
             elif value is False:
                 continue
             else:
-                img_attr_chunks.append(
-                    " " + name + '="' + self._html_escape(str(value)) + '"'
-                )
-        # width/height для CLS из базового path — только если пользователь
-        # не задал свои (напрямую или через imgAttrs): без дублирования.
-        img_attr_names = {name for name, _ in img_attrs}
-        if base.get("width") and "width" not in img_attr_names:
-            img_attr_chunks.append(' width="' + str(base["width"]) + '"')
-        if base.get("height") and "height" not in img_attr_names:
-            img_attr_chunks.append(' height="' + str(base["height"]) + '"')
+                img_parts.extend((" " + name + '="', escape(value), '"'))
 
-        img_html = "<img" + "".join(img_attr_chunks) + ">"
+        if img_group["width"] and "width" not in img_attr_names:
+            img_parts.extend((' width="', str(img_group["width"]), '"'))
+        if img_group["height"] and "height" not in img_attr_names:
+            img_parts.extend((' height="', str(img_group["height"]), '"'))
 
-        if not sources:
+        img_parts.append(">")
+        img_html = "".join(img_parts)
+
+        if len(groups) == 1:
             return img_html
 
-        picture_attrs = self._render_attrs(pic_attrs)
-        lines = ["<picture" + picture_attrs + ">"]
-        for src_group in sources:
-            attrs = " type=" + '"' + self._html_escape(src_group["type"]) + '"'
-            if len(src_group["paths"]) > 1:
-                srcset = self._build_srcset(src_group["paths"], use_width)
-                attrs += " srcset=" + '"' + self._html_escape(srcset) + '"'
-            else:
-                attrs += " src=" + '"' + self._html_escape(src_group["paths"][0]["path"]) + '"'
-            lines.append("    <source" + attrs + ">")
-        lines.append("    " + img_html)
-        lines.append("</picture>")
-        return "\n".join(lines)
+        parts = ["<picture" + self._render_attrs(pic_attrs) + ">"]
+        for idx, group in enumerate(groups):
+            if idx == img_index or not group["srcset"]:
+                continue
+            parts.append(
+                '<source type="' + escape(group["type"]) +
+                '" srcset="' + escape(group["srcset"]) + '">'
+            )
+        parts.append(img_html)
+        parts.append("</picture>")
+        return "".join(parts)
 
     def GetAssetPath(
         self,
@@ -730,68 +880,53 @@ class Imager:
         format: Optional[str] = None,
         dpr: Optional[Union[int, str]] = None,
     ) -> str:
-        """URL ассета для целевого dpr (суффикс `@dpr` при dpr >= 2)."""
         cache = self._src_cache
         if cache is not None and cache[0] == source:
             source_format = cache[3]
             prefix = cache[4]
         else:
             path, source_name, source_format = self._split_source(source)
-            prefix = self._url_prefix(path, source_name, source_format)
+            if source_format:
+                name = source_name + "-" + source_format
+            else:
+                name = source_name
+            prefix = self._baseURL + path + "/" + name + "/" if path else self._baseURL + name + "/"
             self._src_cache = (source, path, source_name, source_format, prefix)
-        seg = segment
-        if seg is None:
+
+        if segment is None:
             seg_str = "x"
-        elif isinstance(seg, str):
-            seg_str = seg
+        elif isinstance(segment, str):
+            seg_str = segment
         else:
-            seg_str = self._segment_to_string(seg)
-        out_format = format if (format is not None and format != "") else self._format
-        if out_format == "":
+            seg_str = self._segment_to_string(segment)
+
+        out_format = format if format else self._format
+        if not out_format:
             out_format = source_format
-        dpr_val = self._resolve_dpr(dpr)
+
+        dpr_val = self._parse_dpr(self._dpr if dpr is None else dpr)
         if dpr_val >= 2:
-            seg_str = seg_str + "@" + str(dpr_val)
+            return prefix + seg_str + "@" + str(dpr_val) + "." + out_format
         return prefix + seg_str + "." + out_format
 
-    # ------------------------------------------------------------------ #
-    #  Админ-методы (HTTP через urllib.request)                          #
-    # ------------------------------------------------------------------ #
-
-    def _admin_request(
-        self, target: Any, wait: bool,
-        endpoint: str, method: str,
-    ) -> bool:
-        """Общий админ-запрос; пустой token/adminURL → False без HTTP.
-
-        target:
-            str          → режим A: {"source": ...}
-            AssetType    → режим B: {"assets": [paths[].path]}
-            AssetType[]  → режим B: {"assets": [paths[].path из ВСЕХ AssetType]}
-            string[]     → режим B: {"assets": [элементы как есть]}
-        """
+    def _admin_request(self, target: Any, wait: bool, endpoint: str, method: str) -> bool:
         if not self._token or not self._adminURL:
             return False
 
-        body: Dict[str, Any]
         if isinstance(target, str):
-            # режим A: source-строка как есть
-            body = {"source": target}
+            body: Dict[str, Any] = {"source": target}
         else:
-            # режим B: собираем список assets
             assets: List[str] = []
             if isinstance(target, list):
                 if target and all(isinstance(item, str) for item in target):
-                    # string[] — пути как есть, без валидации и преобразований
-                    assets = [item for item in target]  # type: ignore[misc]
+                    assets = [item for item in target]
                 else:
-                    # AssetType[] — path'ы всех AssetType подряд
                     for item in target:
                         assets.extend(p_str["path"] for p_str in item["paths"])
             else:
-                # AssetType — все paths[].path
                 assets = [p_str["path"] for p_str in target["paths"]]
             body = {"assets": assets}
+
         if wait is not None:
             body["wait"] = wait
 
@@ -823,10 +958,6 @@ class Imager:
         target: Union[str, AssetType, List[AssetType], List[str]],
         wait: bool = False,
     ) -> bool:
-        """POST {adminURL}/admin/assets/generate → 200/202.
-
-        target: str | AssetType | list[AssetType] | list[str] (маппинг §7.1).
-        """
         return self._admin_request(target, wait, "/admin/assets/generate", "POST")
 
     def AdminDelete(
@@ -834,8 +965,4 @@ class Imager:
         target: Union[str, AssetType, List[AssetType], List[str]],
         wait: bool = False,
     ) -> bool:
-        """DELETE {adminURL}/admin/assets/delete → 200.
-
-        target: str | AssetType | list[AssetType] | list[str] (маппинг §7.1).
-        """
         return self._admin_request(target, wait, "/admin/assets/delete", "DELETE")

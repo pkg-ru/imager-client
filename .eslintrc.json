@@ -19,7 +19,7 @@
     },
     "overrides": [
         {
-            "files": ["test/**/*.ts"],
+            "files": ["test/**/*.ts", "packages/*/test/**/*.ts", "packages/*/test/**/*.tsx"],
             "rules": {
                 "no-console": "off"
             }

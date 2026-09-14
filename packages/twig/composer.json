@@ -2,6 +2,7 @@
     "name": "pkg-ru/imager-twig",
     "description": "Twig-расширение для микросервиса Imager: imager_assets, imager_asset, imager_assets_raw",
     "license": "GPL-3.0-only",
+    "readme": "README.md",
     "type": "library",
     "require": {
         "php": ">=8.0",

@@ -1,3 +1,9 @@
+/*! @license
+ * imager-client — клиент микросервиса Imager
+ * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Автор: Vladislav Altukhov (https://altuh.ru/about)
+ * Демо: https://altuh.ru/demo/imager
+ */
 /** Класс Imager — клиент микросервиса imager (TypeScript, клиентская часть).
 
 Клиентская часть (GetAsset/GetAssets/GetAssetPath) — чистое построение
@@ -14,6 +20,7 @@ import {
     Segment,
     mimeFor,
 } from "./ImagerTypes";
+
 import {
     buildSrcset,
     groupAssets,
@@ -22,15 +29,17 @@ import {
     useWidthDescriptors,
 } from "./render";
 
-export { AssetType, AssetPath, ImagerOptions, Segment, mimeFor } from "./ImagerTypes";
-
 /** Сегмент-объект с необязательными размерами. */
 interface SizeSegment {
     width?: number;
     height?: number;
 }
 
-type SegmentValue = Segment | SizeSegment | null | undefined;
+type SegmentValue =
+    | Segment
+    | SizeSegment
+    | null
+    | undefined;
 
 /** Внутренний mutable context нормализации сегмента (без аллокаций). */
 interface SegCtx {
@@ -52,136 +61,227 @@ export class Imager {
     protected _lastSourceFormat = "";
     private _srcCached = false;
 
-    // переиспользуемый context для нормализации сегмента
-    private _segCtx: SegCtx = { segStr: "x", isSize: true, width: 0, height: 0 };
+    private _segCtx: SegCtx = {
+        segStr: "x",
+        isSize: true,
+        width: 0,
+        height: 0,
+    };
 
     constructor(options?: ImagerOptions | null) {
-        const o = options && typeof options === "object" ? options : {};
+        const o =
+            options && typeof options === "object"
+                ? options
+                : {};
 
-        // dpr: строки/числа → число; некорректное → 0
-        this._dpr = Imager._toInt(o.dpr === undefined ? 0 : o.dpr);
+        this._dpr = Imager._parseDpr(o.dpr === undefined ? 0 : o.dpr);
 
-        // format / formats
-        this._format = o.format === null || o.format === undefined ? "" : String(o.format);
-        this._formats = Array.isArray(o.formats) ? o.formats.map(String) : [];
+        this._format =
+            o.format === null || o.format === undefined
+                ? ""
+                : String(o.format);
 
-        // baseURL — нормализация «…/» в конце
-        const base = o.baseURL === undefined || o.baseURL === null ? "" : String(o.baseURL);
-        this._baseURL = base === "" ? "/" : base.endsWith("/") ? base : base + "/";
+        this._formats =
+            Array.isArray(o.formats)
+                ? o.formats.map(String)
+                : [];
+
+        const base =
+            o.baseURL === undefined || o.baseURL === null
+                ? ""
+                : String(o.baseURL);
+
+        this._baseURL =
+            base === ""
+                ? "/"
+                : base.endsWith("/")
+                  ? base
+                  : base + "/";
     }
-
-    // ------------------------------------------------------------------ //
-    //  Приведение значений (как int() в Python-эталоне)                  //
-    // ------------------------------------------------------------------ //
 
     private static _toInt(value: unknown): number {
         if (typeof value === "number") {
-            return Number.isFinite(value) ? Math.trunc(value) : 0;
+            return Number.isFinite(value)
+                ? Math.trunc(value)
+                : 0;
         }
+
         if (typeof value === "string") {
-            const s = value;
-            const n = s.length;
+            const len = value.length;
             let i = 0;
-            // ведущие пробелы (как String.prototype.trim)
-            while (i < n) {
-                const c = s.charCodeAt(i);
-                if (c === 32 || c === 9 || c === 10 || c === 11 || c === 12 || c === 13) {
+
+            while (i < len) {
+                const c = value.charCodeAt(i);
+
+                if (
+                    c === 32 ||
+                    c === 9 ||
+                    c === 10 ||
+                    c === 11 ||
+                    c === 12 ||
+                    c === 13
+                ) {
                     i++;
-                } else {
-                    break;
+                    continue;
                 }
+
+                break;
             }
+
             let sign = 1;
-            if (i < n) {
-                const c = s.charCodeAt(i);
+
+            if (i < len) {
+                const c = value.charCodeAt(i);
+
                 if (c === 43 || c === 45) {
                     if (c === 45) {
                         sign = -1;
                     }
+
                     i++;
                 }
             }
-            if (i >= n) {
+
+            if (i >= len) {
                 return 0;
             }
-            let v = 0;
-            const ds = i;
-            while (i < n) {
-                const c = s.charCodeAt(i);
+
+            let number = 0;
+            const start = i;
+
+            while (i < len) {
+                const c = value.charCodeAt(i);
+
                 if (c >= 48 && c <= 57) {
-                    v = v * 10 + (c - 48);
+                    number = number * 10 + c - 48;
                     i++;
                 } else {
                     break;
                 }
             }
-            if (i === ds) {
+
+            if (i === start) {
                 return 0;
             }
-            // хвостовые пробелы
-            while (i < n) {
-                const c = s.charCodeAt(i);
-                if (c === 32 || c === 9 || c === 10 || c === 11 || c === 12 || c === 13) {
+
+            while (i < len) {
+                const c = value.charCodeAt(i);
+
+                if (
+                    c === 32 ||
+                    c === 9 ||
+                    c === 10 ||
+                    c === 11 ||
+                    c === 12 ||
+                    c === 13
+                ) {
                     i++;
-                } else {
-                    break;
+                    continue;
                 }
-            }
-            if (i < n) {
+
                 return 0;
             }
-            return sign < 0 ? (v === 0 ? 0 : -v) : v;
+
+            return sign < 0
+                ? number === 0
+                    ? 0
+                    : -number
+                : number;
         }
+
         if (typeof value === "boolean") {
             return value ? 1 : 0;
         }
+
         return 0;
     }
 
-    // ------------------------------------------------------------------ //
-    //  Разбор source: префикс path/name строит один раз (с кэшем).       //
-    // ------------------------------------------------------------------ //
+    private static _parseDpr(dpr: unknown): number {
+        const number = Imager._toInt(dpr);
 
-    /** Обновляет кэш source: _lastPrefix + _lastSourceFormat. */
+        if (number < 1) {
+            return 0;
+        }
+
+        if (number > 3) {
+            return 3;
+        }
+
+        return number;
+    }
+
+    protected _resolveDpr(dpr: number | string | null | undefined): number {
+        if (dpr === null || dpr === undefined) {
+            return this._dpr;
+        }
+
+        return Imager._parseDpr(dpr);
+    }
+
     protected _updateSource(source: unknown): void {
-        if (this._srcCached && source === this._lastSource) {
+        if (
+            this._srcCached &&
+            source === this._lastSource
+        ) {
             return;
         }
 
-        let s = source === null || source === undefined ? "" : String(source);
-        let i = 0;
-        const len = s.length;
-        while (i < len && s.charCodeAt(i) === 47) {
-            i++;
-        }
-        if (i > 0) {
-            s = s.slice(i);
+        let value =
+            source === null || source === undefined
+                ? ""
+                : String(source);
+
+        let start = 0;
+        const length = value.length;
+
+        while (start < length && value.charCodeAt(start) === 47) {
+            start++;
         }
 
-        const lastSlash = s.lastIndexOf("/");
-        let path: string;
-        let file: string;
-        if (lastSlash >= 0) {
-            path = s.slice(0, lastSlash);
-            file = s.slice(lastSlash + 1);
-        } else {
-            path = "";
-            file = s;
+        if (start > 0) {
+            value = value.slice(start);
         }
 
-        const lastDot = file.lastIndexOf(".");
+        const slash = value.lastIndexOf("/");
+
+        let path = "";
+        let file = value;
+
+        if (slash >= 0) {
+            path = value.slice(0, slash);
+            file = value.slice(slash + 1);
+        }
+
+        const dot = file.lastIndexOf(".");
+
         let sourceName: string;
         let sourceFormat: string;
-        if (lastDot >= 0) {
-            sourceName = file.slice(0, lastDot);
-            sourceFormat = file.slice(lastDot + 1).toLowerCase();
+
+        if (dot >= 0) {
+            sourceName = file.slice(0, dot);
+            sourceFormat = file
+                .slice(dot + 1)
+                .toLowerCase();
         } else {
             sourceName = file;
             sourceFormat = "";
         }
 
-        const name = sourceFormat ? sourceName + "-" + sourceFormat : sourceName;
-        const prefix = path ? this._baseURL + path + "/" + name + "/" : this._baseURL + name + "/";
+        const name =
+            sourceFormat !== ""
+                ? sourceName + "-" + sourceFormat
+                : sourceName;
+
+        const prefix =
+            path !== ""
+                ? this._baseURL +
+                  path +
+                  "/" +
+                  name +
+                  "/"
+                : this._baseURL +
+                  name +
+                  "/";
 
         this._lastSource = source;
         this._lastSourceFormat = sourceFormat;
@@ -189,215 +289,242 @@ export class Imager {
         this._srcCached = true;
     }
 
-    // ------------------------------------------------------------------ //
-    //  Формализация сегмента                                             //
-    // ------------------------------------------------------------------ //
-
     private static _buildSize(width: number, height: number): string {
         if (width > 0) {
             if (height > 0) {
-                return String(width) + "x" + String(height);
+                return (String(width) + "x" + String(height));
             }
+
             return String(width) + "x";
         }
+
         if (height > 0) {
             return "x" + String(height);
         }
+
         return "x";
     }
 
-    /** Одноходовой разбор "WxH" — пишет в ctx, возвращает isSize. */
     protected _parseSegment(segment: SegmentValue): SegCtx {
         const ctx = this._segCtx;
-        if (segment === null || segment === undefined) {
+
+        if (
+            segment === null ||
+            segment === undefined
+        ) {
             ctx.segStr = "x";
             ctx.isSize = true;
             ctx.width = 0;
             ctx.height = 0;
             return ctx;
         }
+
         if (typeof segment === "string") {
-            const ok = this._parseSizeString(segment, ctx);
-            if (!ok) {
+            const length = segment.length;
+
+            let xIndex = -1;
+
+            for (let i = 0; i < length; i++) {
+                if (segment.charCodeAt(i) === 120) {
+                    xIndex = i;
+                    break;
+                }
+            }
+
+            if (xIndex < 0) {
                 ctx.segStr = segment;
                 ctx.isSize = false;
                 ctx.width = 0;
                 ctx.height = 0;
-            } else {
-                ctx.segStr = segment;
+                return ctx;
             }
+
+            let width = 0;
+
+            for (let i = 0; i < xIndex; i++) {
+                const c = segment.charCodeAt(i);
+
+                if (c < 48 || c > 57) {
+                    ctx.segStr = segment;
+                    ctx.isSize = false;
+                    ctx.width = 0;
+                    ctx.height = 0;
+                    return ctx;
+                }
+
+                width = width * 10 + c - 48;
+            }
+
+            let height = 0;
+
+            for (let i = xIndex + 1; i < length; i++) {
+                const c = segment.charCodeAt(i);
+
+                if (c < 48 || c > 57) {
+                    ctx.segStr = segment;
+                    ctx.isSize = false;
+                    ctx.width = 0;
+                    ctx.height = 0;
+                    return ctx;
+                }
+
+                height = height * 10 + c - 48;
+            }
+
+            ctx.segStr = segment;
+            ctx.isSize = true;
+            ctx.width = width;
+            ctx.height = height;
+
             return ctx;
         }
+
         if (typeof segment === "object") {
-            let width: number;
-            let height: number;
+            let width = 0;
+            let height = 0;
+
             if (Array.isArray(segment)) {
+                const first = segment[0];
+                const second = segment[1];
+
                 width =
-                    segment.length > 0 && segment[0] !== null && segment[0] !== undefined
-                        ? Imager._toInt(segment[0])
-                        : 0;
+                    first === null ||
+                    first === undefined
+                        ? 0
+                        : Imager._toInt(first);
+
                 height =
-                    segment.length > 1 && segment[1] !== null && segment[1] !== undefined
-                        ? Imager._toInt(segment[1])
-                        : 0;
+                    second === null ||
+                    second === undefined
+                        ? 0
+                        : Imager._toInt(second);
             } else {
-                const segmentObj = segment as SizeSegment;
-                const sw = segmentObj.width;
-                const sh = segmentObj.height;
-                width = sw === null || sw === undefined ? 0 : Imager._toInt(sw);
-                height = sh === null || sh === undefined ? 0 : Imager._toInt(sh);
+                const value =
+                    segment as SizeSegment;
+
+                width =
+                    value.width === null ||
+                    value.width === undefined
+                        ? 0
+                        : Imager._toInt(value.width);
+
+                height =
+                    value.height === null ||
+                    value.height === undefined
+                        ? 0
+                        : Imager._toInt(value.height);
             }
+
             ctx.segStr = Imager._buildSize(width, height);
             ctx.isSize = true;
             ctx.width = width;
             ctx.height = height;
+
             return ctx;
         }
-        // прочие типы → размер без размеров
+
         ctx.segStr = "x";
         ctx.isSize = true;
         ctx.width = 0;
         ctx.height = 0;
+
         return ctx;
     }
 
-    /** Парсинг "200x300" → true/false; результат записывается в ctx. */
-    private _parseSizeString(segment: string, ctx: SegCtx): boolean {
-        const len = segment.length;
-        let xi = -1;
-        for (let j = 0; j < len; j++) {
-            if (segment.charCodeAt(j) === 120) {
-                xi = j;
-                break;
-            }
-        }
-        if (xi < 0) {
-            ctx.isSize = false;
-            ctx.width = 0;
-            ctx.height = 0;
-            return false;
-        }
-        let width = 0;
-        if (xi > 0) {
-            for (let j = 0; j < xi; j++) {
-                const c = segment.charCodeAt(j);
-                if (c < 48 || c > 57) {
-                    ctx.isSize = false;
-                    ctx.width = 0;
-                    ctx.height = 0;
-                    return false;
-                }
-                width = width * 10 + (c - 48);
-            }
-        }
-        let height = 0;
-        for (let j = xi + 1; j < len; j++) {
-            const c = segment.charCodeAt(j);
-            if (c < 48 || c > 57) {
-                ctx.isSize = false;
-                ctx.width = 0;
-                ctx.height = 0;
-                return false;
-            }
-            height = height * 10 + (c - 48);
-        }
-        ctx.isSize = true;
-        ctx.width = width;
-        ctx.height = height;
-        return true;
-    }
-
-    /** Только строка сегмента (без width/height) — лёгкий путь. */
-    protected _segmentString(segment: SegmentValue): string {
-        if (segment === null || segment === undefined) {
+    protected _segmentString(
+        segment: SegmentValue,
+    ): string {
+        if (
+            segment === null ||
+            segment === undefined
+        ) {
             return "x";
         }
+
         if (typeof segment === "string") {
             return segment;
         }
+
         if (typeof segment === "object") {
+            let width = 0;
+            let height = 0;
+
             if (Array.isArray(segment)) {
-                const width =
-                    segment.length > 0 && segment[0] !== null && segment[0] !== undefined
-                        ? Imager._toInt(segment[0])
-                        : 0;
-                const height =
-                    segment.length > 1 && segment[1] !== null && segment[1] !== undefined
-                        ? Imager._toInt(segment[1])
-                        : 0;
-                return Imager._buildSize(width, height);
+                const first = segment[0];
+                const second = segment[1];
+
+                width =
+                    first === null ||
+                    first === undefined
+                        ? 0
+                        : Imager._toInt(first);
+
+                height =
+                    second === null ||
+                    second === undefined
+                        ? 0
+                        : Imager._toInt(second);
+            } else {
+                const value =
+                    segment as SizeSegment;
+
+                width =
+                    value.width === null ||
+                    value.width === undefined
+                        ? 0
+                        : Imager._toInt(value.width);
+
+                height =
+                    value.height === null ||
+                    value.height === undefined
+                        ? 0
+                        : Imager._toInt(value.height);
             }
-            const segmentObj = segment as SizeSegment;
-            const sw = segmentObj.width;
-            const sh = segmentObj.height;
-            const width = sw === null || sw === undefined ? 0 : Imager._toInt(sw);
-            const height = sh === null || sh === undefined ? 0 : Imager._toInt(sh);
+
             return Imager._buildSize(width, height);
         }
+
         return "x";
     }
 
-    // ------------------------------------------------------------------ //
-    //  dpr                                                               //
-    // ------------------------------------------------------------------ //
-
-    private static _parseDpr(dpr: unknown): number {
-        const number = Imager._toInt(dpr);
-        if (number < 1) {
-            return 0;
-        }
-        if (number > 3) {
-            return 3;
-        }
-        return number;
+    private static _htmlEscape(value: unknown): string {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#x27;");
     }
 
-    protected _resolveDpr(dpr: number | string | null | undefined): number {
-        if (dpr !== null && dpr !== undefined) {
-            return Imager._parseDpr(dpr);
+    private static _renderAttrs(attrs: Record<string, unknown>): string {
+        const keys = Object.keys(attrs);
+
+        let result = "";
+
+        for (let i = 0; i < keys.length; i++) {
+            const name = keys[i];
+            const value = attrs[name];
+
+            if (value === true) {
+                result += " " + name;
+            } else if (
+                value === false ||
+                value === null ||
+                value === undefined
+            ) {
+                continue;
+            } else {
+                result +=
+                    " " +
+                    name +
+                    '="' +
+                    Imager._htmlEscape(value) +
+                    '"';
+            }
         }
-        return Imager._parseDpr(this._dpr);
+
+        return result;
     }
-
-    // ------------------------------------------------------------------ //
-    //  Построение списка paths (общий для GetAssets)                     //
-    // ------------------------------------------------------------------ //
-
-    /** Пути для одного сегмента: все dpr-шаги подряд (сегмент-мажорно). */
-    protected _segmentPaths(
-        prefix: string,
-        segStr: string,
-        isSize: boolean,
-        width: number,
-        height: number,
-        eff: string,
-        dprVal: number,
-        explicit: boolean,
-        maxSteps: number,
-    ): AssetPath[] {
-        const paths = new Array<AssetPath>(maxSteps);
-        for (let step = 1; step <= maxSteps; step++) {
-            const suffix = step >= 2 ? "@" + step : "";
-            const item: AssetPath = { path: prefix + segStr + suffix + "." + eff };
-            if (dprVal === 1 && explicit) {
-                item.dpr = 1;
-            } else if (step >= 2) {
-                item.dpr = step;
-            }
-            if (isSize && width > 0) {
-                item.width = step >= 2 ? width * step : width;
-            }
-            if (isSize && height > 0) {
-                item.height = step >= 2 ? height * step : height;
-            }
-            paths[step - 1] = item;
-        }
-        return paths;
-    }
-
-    // ------------------------------------------------------------------ //
-    //  Клиентские методы — без HTTP, без валидации, без исключений       //
-    // ------------------------------------------------------------------ //
 
     GetAsset(
         source: string,
@@ -406,48 +533,89 @@ export class Imager {
         dpr?: number | string | null,
     ): AssetType {
         this._updateSource(source);
-        const prefix = this._lastPrefix;
-        const sourceFormat = this._lastSourceFormat;
 
-        const ctx = this._parseSegment(segment);
-        const segStr = ctx.segStr;
-        const isSize = ctx.isSize;
-        const width = ctx.width;
-        const height = ctx.height;
+        const prefix = this._lastPrefix;
+        const sourceFormat =
+            this._lastSourceFormat;
+
+        const ctx =
+            this._parseSegment(segment);
 
         let outFormat =
-            format !== null && format !== undefined && format !== "" ? format : this._format;
-        if (!outFormat) {
+            format !== null &&
+            format !== undefined &&
+            format !== ""
+                ? format
+                : this._format;
+
+        if (outFormat === "") {
             outFormat = sourceFormat;
         }
 
-        const dprVal = this._resolveDpr(dpr);
-        const explicit = dpr !== null && dpr !== undefined;
+        const dprValue =
+            this._resolveDpr(dpr);
 
-        // dpr — целевое значение: формирует ровно один вариант ассета
-        const paths = new Array<AssetPath>(1);
-        const p1: AssetPath =
-            dprVal >= 2
-                ? { path: prefix + segStr + "@" + dprVal + "." + outFormat, dpr: dprVal }
-                : { path: prefix + segStr + "." + outFormat };
-        if (dprVal === 1 && explicit) {
-            p1.dpr = 1;
-        }
-        if (isSize && width > 0) {
-            p1.width = dprVal >= 2 ? width * dprVal : width;
-        }
-        if (isSize && height > 0) {
-            p1.height = dprVal >= 2 ? height * dprVal : height;
-        }
-        paths[0] = p1;
+        let path: AssetPath;
 
-        const asset: AssetType = { type: mimeFor(outFormat) || "", paths };
+        if (dprValue >= 2) {
+            path = {
+                path:
+                    prefix +
+                    ctx.segStr +
+                    "@" +
+                    dprValue +
+                    "." +
+                    outFormat,
+                dpr: dprValue,
+            };
+        } else {
+            path = {
+                path:
+                    prefix +
+                    ctx.segStr +
+                    "." +
+                    outFormat,
+            };
+        }
+
+        if (
+            ctx.isSize &&
+            ctx.width > 0
+        ) {
+            path.width =
+                dprValue >= 2
+                    ? ctx.width * dprValue
+                    : ctx.width;
+        }
+
+        if (
+            ctx.isSize &&
+            ctx.height > 0
+        ) {
+            path.height =
+                dprValue >= 2
+                    ? ctx.height * dprValue
+                    : ctx.height;
+        }
+
+        const asset: AssetType = {
+            type: mimeFor(outFormat),
+            paths: [path],
+        };
+
         if (outFormat === sourceFormat) {
             asset.source_format = true;
         }
-        if (outFormat === "jpg" || outFormat === "jpeg" || outFormat === "gif" || outFormat === "png") {
+
+        if (
+            outFormat === "jpg" ||
+            outFormat === "jpeg" ||
+            outFormat === "gif" ||
+            outFormat === "png"
+        ) {
             asset.all_support = true;
         }
+
         return asset;
     }
 
@@ -458,167 +626,346 @@ export class Imager {
         dprs?: number | string | null,
     ): AssetType[] {
         this._updateSource(source);
-        const prefix = this._lastPrefix;
-        const sourceFormat = this._lastSourceFormat;
 
-        // форматы: аргумент → настройки formats → format → [исходный]
-        let fmtList: string[] = [];
-        if (formats === null || formats === undefined) {
+        const prefix = this._lastPrefix;
+        const sourceFormat =
+            this._lastSourceFormat;
+
+        let fmtList: string[];
+
+        if (
+            formats === null ||
+            formats === undefined
+        ) {
             if (this._formats.length > 0) {
                 fmtList = this._formats;
-            } else if (this._format) {
+            } else if (this._format !== "") {
                 fmtList = [this._format];
             } else {
-                fmtList = sourceFormat ? [sourceFormat] : [""];
+                fmtList =
+                    sourceFormat !== ""
+                        ? [sourceFormat]
+                        : [""];
             }
-        } else if (typeof formats === "string") {
-            fmtList = formats !== "" ? [formats] : [];
+        } else if (
+            typeof formats === "string"
+        ) {
+            fmtList =
+                formats !== ""
+                    ? [formats]
+                    : [];
         } else {
-            const arr = formats as string[];
-            const list: string[] = new Array(arr.length);
-            for (let i = 0; i < arr.length; i++) {
-                list[i] = String(arr[i]);
+            const sourceFormats =
+                formats as string[];
+
+            const length =
+                sourceFormats.length;
+
+            const list =
+                new Array<string>(length);
+
+            for (let i = 0; i < length; i++) {
+                list[i] = String(sourceFormats[i]);
             }
+
             fmtList = list;
         }
+
         if (fmtList.length === 0) {
             if (this._formats.length > 0) {
                 fmtList = this._formats;
-            } else if (this._format) {
+            } else if (this._format !== "") {
                 fmtList = [this._format];
             } else {
-                fmtList = sourceFormat ? [sourceFormat] : [""];
+                fmtList =
+                    sourceFormat !== ""
+                        ? [sourceFormat]
+                        : [""];
             }
         }
 
-        const dprVal = this._resolveDpr(dprs);
-        const explicit = dprs !== null && dprs !== undefined;
+        const dprValue = this._resolveDpr(dprs);
+
+        const explicit =
+            (dprs !== null && dprs !== undefined) ||
+            this._dpr > 0;
 
         let maxSteps: number;
-        if (dprVal < 1 || dprVal === 1) {
+
+        if (dprValue <= 1) {
             maxSteps = 1;
-        } else if (dprVal === 2) {
+        } else if (dprValue === 2) {
             maxSteps = 2;
         } else {
             maxSteps = 3;
         }
 
-        // effective formats и MIME — один раз на формат
-        const nf = fmtList.length;
-        const effList: string[] = new Array(nf);
-        const mimeList: string[] = new Array(nf);
-        for (let i = 0; i < nf; i++) {
-            const eff = fmtList[i] !== "" ? fmtList[i] : sourceFormat;
-            effList[i] = eff;
-            mimeList[i] = mimeFor(eff) || "";
-        }
-
-        // сегменты: не задан → [null] → "x"
         let segList: SegmentValue[];
-        if (segments === null || segments === undefined) {
+
+        if (
+            segments === null ||
+            segments === undefined
+        ) {
             segList = [null];
-        } else if (Array.isArray(segments)) {
+        } else if (
+            Array.isArray(segments)
+        ) {
             segList = segments as unknown as SegmentValue[];
         } else {
-            segList = [segments as SegmentValue];
+            segList = [
+                segments as SegmentValue,
+            ];
         }
 
-        // Пути всех сегментов по каждому формату (сегмент-мажорно).
-        // pathsByFmt[f] — массив AssetPath для формата f.
-        const pathsByFmt: AssetPath[][] = new Array(nf);
-        for (let f = 0; f < nf; f++) {
-            pathsByFmt[f] = [];
+        const segmentCount = segList.length;
+        const formatCount = fmtList.length;
+
+        /*
+         * Базовые размеры определяются до генерации путей.
+         *
+         * Это полностью эквивалентно старой логике:
+         * первый width > 0 и первый height > 0.
+         */
+        let baseWidth = 0;
+        let baseHeight = 0;
+
+        for (let i = 0; i < segmentCount; i++) {
+            const ctx = this._parseSegment(segList[i]);
+
+            if (
+                baseWidth === 0 &&
+                ctx.isSize &&
+                ctx.width > 0
+            ) {
+                baseWidth = ctx.width;
+            }
+
+            if (
+                baseHeight === 0 &&
+                ctx.isSize &&
+                ctx.height > 0
+            ) {
+                baseHeight = ctx.height;
+            }
+
+            if (baseWidth > 0 && baseHeight > 0) {
+                break;
+            }
         }
-        for (let s = 0; s < segList.length; s++) {
+
+        const effList = new Array<string>(formatCount);
+
+        const mimeList = new Array<string>(formatCount);
+
+        const sourceFormatFlags = new Array<boolean>(formatCount);
+
+        const allSupportFlags = new Array<boolean>(formatCount);
+
+        for (let i = 0; i < formatCount; i++) {
+            const sourceValue = fmtList[i];
+
+            const effective =
+                sourceValue !== ""
+                    ? sourceValue
+                    : sourceFormat;
+
+            effList[i] = effective;
+            mimeList[i] = mimeFor(effective);
+
+            sourceFormatFlags[i] = effective === sourceFormat;
+
+            allSupportFlags[i] =
+                effective === "jpg" ||
+                effective === "jpeg" ||
+                effective === "gif" ||
+                effective === "png";
+        }
+
+        const totalPaths = segmentCount * maxSteps;
+
+        const pathsByFormat = new Array<AssetPath[]>(formatCount);
+
+        for (let i = 0; i < formatCount; i++) {
+            pathsByFormat[i] = new Array<AssetPath>(totalPaths);
+        }
+
+        /*
+         * Второй проход по сегментам:
+         * сегмент разбирается ровно один раз
+         * при построении результатов.
+         */
+        for (let s = 0; s < segmentCount; s++) {
             const ctx = this._parseSegment(segList[s]);
-            for (let f = 0; f < nf; f++) {
-                const segPaths = this._segmentPaths(
-                    prefix, ctx.segStr, ctx.isSize, ctx.width, ctx.height,
-                    effList[f], dprVal, explicit, maxSteps,
-                );
-                pathsByFmt[f].push(...segPaths);
+
+            const segStr = ctx.segStr;
+
+            const isSize = ctx.isSize;
+
+            const width = ctx.width;
+
+            const height = ctx.height;
+
+            for (let f = 0; f < formatCount; f++) {
+                const effective = effList[f];
+
+                const paths = pathsByFormat[f];
+
+                const pathBase = s * maxSteps;
+
+                for (let step = 1; step <= maxSteps; step++) {
+                    const hasStepDpr = step >= 2;
+
+                    const suffix = hasStepDpr ? "@" + step : "";
+
+                    const path =
+                        prefix +
+                        segStr +
+                        suffix +
+                        "." +
+                        effective;
+
+                    /*
+                     * x-пути:
+                     *
+                     * старый код сохранял dpr=2/3,
+                     * потому что последующая нормализация
+                     * не находила width/height и оставляла
+                     * исходный объект без пересоздания.
+                     */
+                    if (!isSize) {
+                        if (hasStepDpr) {
+                            paths[pathBase + step - 1] = {
+                                path,
+                                dpr: step,
+                            };
+                        } else if (dprValue === 1 && explicit) {
+                            paths[pathBase + step - 1] = {
+                                path,
+                                dpr: 1,
+                            };
+                        } else {
+                            paths[pathBase + step - 1] = {
+                                path,
+                            };
+                        }
+
+                        continue;
+                    }
+
+                    let actualDpr: number | undefined;
+
+                    if (baseWidth > 0 && width > 0) {
+                        actualDpr = (width * step) / baseWidth;
+                    } else if (baseHeight > 0 && height > 0) {
+                        actualDpr = (height * step) / baseHeight;
+                    }
+
+                    const itemWidth = width > 0 ? width * step : undefined;
+
+                    const itemHeight = height > 0 ? height * step : undefined;
+
+                    let item: AssetPath;
+
+                    if (actualDpr !== undefined) {
+                        if (actualDpr === 1 && !explicit) {
+                            item = { path };
+                        } else {
+                            item = {
+                                path,
+                                dpr: actualDpr,
+                            };
+                        }
+                    } else if (step >= 2) {
+                        item = {
+                            path,
+                            dpr: step,
+                        };
+                    } else {
+                        item = { path };
+                    }
+
+                    if (
+                        itemWidth !== undefined
+                    ) {
+                        item.width = itemWidth;
+                    }
+
+                    if (
+                        itemHeight !== undefined
+                    ) {
+                        item.height = itemHeight;
+                    }
+
+                    paths[pathBase + step - 1] = item;
+                }
             }
         }
 
-        // dpr из фактических размеров: базовая ширина = ширина первого
-        // участника с известной шириной; dpr = фактическая ширина / базовая.
-        // Если ширины нет — по высоте; если ни того, ни другого — без dpr.
-        const result = new Array<AssetType>(nf);
-        for (let f = 0; f < nf; f++) {
-            const paths = pathsByFmt[f];
-            let baseWidth = 0;
-            let baseHeight = 0;
-            for (const item of paths) {
-                if (baseWidth === 0 && item.width !== undefined && item.width > 0) {
-                    baseWidth = item.width;
-                }
-                if (baseHeight === 0 && item.height !== undefined && item.height > 0) {
-                    baseHeight = item.height;
-                }
-            }
-            for (let j = 0; j < paths.length; j++) {
-                const item = paths[j];
-                let dpr: number | undefined;
-                if (baseWidth > 0 && item.width !== undefined && item.width > 0) {
-                    dpr = item.width / baseWidth;
-                } else if (baseHeight > 0 && item.height !== undefined && item.height > 0) {
-                    dpr = item.height / baseHeight;
-                }
-                if (dpr === undefined) {
-                    continue;
-                }
-                // пересоздаём с порядком ключей path, dpr, width, height
-                const rebuilt: AssetPath = { path: item.path, dpr };
-                if (item.width !== undefined) {
-                    rebuilt.width = item.width;
-                }
-                if (item.height !== undefined) {
-                    rebuilt.height = item.height;
-                }
-                paths[j] = rebuilt;
-            }
-            const asset: AssetType = { type: mimeList[f], paths };
-            if (effList[f] === sourceFormat) {
+        const result = new Array<AssetType>(formatCount);
+
+        for (let f = 0; f < formatCount; f++) {
+            const asset: AssetType = {
+                type: mimeList[f],
+                paths: pathsByFormat[f],
+            };
+
+            if (sourceFormatFlags[f]) {
                 asset.source_format = true;
             }
-            if (effList[f] === "jpg" || effList[f] === "jpeg" || effList[f] === "gif" || effList[f] === "png") {
+
+            if (allSupportFlags[f]) {
                 asset.all_support = true;
             }
+
             result[f] = asset;
         }
 
         return result;
     }
 
-    // ------------------------------------------------------------------ //
-    //  HTML-генерация (GetAssetsHtml)                                    //
-    // ------------------------------------------------------------------ //
+    GetAssetPath(
+        source: string,
+        segment?: Segment | null,
+        format?: string | null,
+        dpr?: number | string | null,
+    ): string {
+        this._updateSource(source);
 
-    /** Экранирование значения HTML-атрибута. */
-    private static _htmlEscape(value: unknown): string {
-        return String(value)
-            .replace(/&/g, "&am" + "p;")
-            .replace(/</g, "&l" + "t;")
-            .replace(/>/g, "&g" + "t;")
-            .replace(/"/g, "&qu" + "ot;")
-            .replace(/'/g, "&#x" + "27;");
-    }
+        const sourceFormat =
+            this._lastSourceFormat;
 
-    /** Рендер атрибутов: true → имя, false → пропуск, иначе name="value". */
-    private static _renderAttrs(attrs: Record<string, unknown>): string {
-        const keys = Object.keys(attrs).sort();
-        let out = "";
-        for (const name of keys) {
-            const value = attrs[name];
-            if (value === true) {
-                out += " " + name;
-            } else if (value === false || value === null || value === undefined) {
-                continue;
-            } else {
-                out += " " + name + '="' + Imager._htmlEscape(value) + '"';
-            }
+        let outFormat =
+            format !== null &&
+            format !== undefined &&
+            format !== ""
+                ? format
+                : this._format;
+
+        if (outFormat === "") {
+            outFormat = sourceFormat;
         }
-        return out;
+
+        const dprValue = this._resolveDpr(dpr);
+
+        const segStr = this._segmentString(segment);
+
+        if (dprValue >= 2) {
+            return (
+                this._lastPrefix +
+                segStr +
+                "@" +
+                dprValue +
+                "." +
+                outFormat
+            );
+        }
+
+        return (
+            this._lastPrefix +
+            segStr +
+            "." +
+            outFormat
+        );
     }
 
     GetAssetsHtml(
@@ -629,60 +976,88 @@ export class Imager {
         options?: Record<string, unknown> | null,
     ): string {
         const assets = this.GetAssets(source, segments, formats, dprs);
+
         if (assets.length === 0) {
             return "";
         }
 
-        const opts: Record<string, unknown> =
-            options && typeof options === "object" ? options : {};
+        const opts =
+            options &&
+            typeof options === "object"
+                ? options
+                : {};
+
         const useWidth = useWidthDescriptors(opts);
 
-        // Разделение атрибутов: img-атрибуты vs атрибуты <picture>
-        // (сортировка в _renderAttrs — детерминированный порядок вывода)
-        const { imgAttrs, picAttrs } = splitAttrs(opts);
+        const {imgAttrs, picAttrs} = splitAttrs(opts);
 
-        // Группировка по типу (формату): пути всех сегментов одного формата
-        // объединяются в один srcset внутри одного <source>/<img>.
         const groups = groupAssets(assets);
 
-        // Выбор группы для <img>:
-        // 1) source_format=true; 2) первая all_support=true; 3) последняя.
         const imgIndex = pickImgGroup(groups);
 
-        const imgPaths = groups[imgIndex].paths;
+        const imgGroup = groups[imgIndex];
+
+        const imgPaths = imgGroup.paths;
+
         const base = imgPaths[0];
 
-        // <img>
-        let img = ' src="' + Imager._htmlEscape(base.path) + '"';
+        let img =
+            ' src="' +
+            Imager._htmlEscape(
+                base.path,
+            ) +
+            '"';
+
         if (imgPaths.length > 1) {
-            img += ' srcset="' + Imager._htmlEscape(buildSrcset(imgPaths, useWidth)) + '"';
+            const srcset = buildSrcset(imgPaths, useWidth);
+
+            if (srcset !== "") {
+                img += ' srcset="' + Imager._htmlEscape(srcset) + '"';
+            }
         }
-        for (const name of Object.keys(imgAttrs).sort()) {
+
+        const imgKeys = Object.keys(imgAttrs);
+
+        for (let i = 0; i < imgKeys.length; i++) {
+            const name = imgKeys[i];
+
             const value = imgAttrs[name];
+
             if (value === true) {
                 img += " " + name;
-            } else if (value === false || value === null || value === undefined) {
+            } else if (
+                value === false ||
+                value === null ||
+                value === undefined
+            ) {
                 continue;
             } else {
                 img += " " + name + '="' + Imager._htmlEscape(value) + '"';
             }
         }
-        // width/height для CLS из базового path — только если пользователь
-        // не задал свои (напрямую или через imgAttrs): без дублирования.
+
         if (
             base.width !== undefined &&
             base.width > 0 &&
-            (imgAttrs["width"] === undefined || imgAttrs["width"] === null)
+            (
+                imgAttrs.width === undefined ||
+                imgAttrs.width === null
+            )
         ) {
             img += ' width="' + base.width + '"';
         }
+
         if (
             base.height !== undefined &&
             base.height > 0 &&
-            (imgAttrs["height"] === undefined || imgAttrs["height"] === null)
+            (
+                imgAttrs.height === undefined ||
+                imgAttrs.height === null
+            )
         ) {
             img += ' height="' + base.height + '"';
         }
+
         const imgHtml = "<img" + img + ">";
 
         if (groups.length === 1) {
@@ -690,42 +1065,26 @@ export class Imager {
         }
 
         let html = "<picture" + Imager._renderAttrs(picAttrs) + ">";
+
         for (let i = 0; i < groups.length; i++) {
             if (i === imgIndex) {
                 continue;
             }
+
             const group = groups[i];
-            html += "\n    " + '<source type="' + Imager._htmlEscape(group.mime) + '"';
-            if (group.paths.length > 1) {
-                html += ' srcset="' + Imager._htmlEscape(buildSrcset(group.paths, useWidth)) + '"';
-            } else {
-                html += ' src="' + Imager._htmlEscape(group.paths[0].path) + '"';
+
+            const srcset = buildSrcset(group.paths, useWidth);
+
+            if (srcset === "") {
+                continue;
             }
-            html += ">";
+
+            html += "<source type=\"" + Imager._htmlEscape(group.mime) + "\" srcset=\"" + Imager._htmlEscape(srcset) + "\">";
         }
-        html += "\n    " + imgHtml + "\n</picture>";
+
+        html += imgHtml + "</picture>";
+
         return html;
-    }
-
-    GetAssetPath(
-        source: string,
-        segment?: Segment | null,
-        format?: string | null,
-        dpr?: number | string | null,
-    ): string {
-        this._updateSource(source);
-        const sourceFormat = this._lastSourceFormat;
-
-        let outFormat =
-            format !== null && format !== undefined && format !== "" ? format : this._format;
-        if (!outFormat) {
-            outFormat = sourceFormat;
-        }
-
-        const dprVal = this._resolveDpr(dpr);
-        const segStr = this._segmentString(segment);
-        const segPart = dprVal >= 2 ? segStr + "@" + dprVal : segStr;
-        return this._lastPrefix + segPart + "." + outFormat;
     }
 }
 

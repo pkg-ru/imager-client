@@ -1,5 +1,7 @@
 .PHONY: test build lint test-react test-vue test-twig build-react build-vue
 
+# Единый прогон: ядра (Go/TS/PHP/Python) + фреймворк-пакеты react/vue
+# (golden-сценарий по test/fixture.json). Twig в golden-прогоне не участвует.
 test:
 	go run test/test.go
 
@@ -9,6 +11,7 @@ test-react:
 test-vue:
 	cd packages/vue && npm test
 
+# Локальный тест twig: сверка расширения с ядром PHP (не golden).
 test-twig:
 	cd packages/twig && php test/test.php
 

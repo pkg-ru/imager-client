@@ -6,6 +6,8 @@ Client library for the **Imager** microservice for four languages — Python, PH
 
 > **Primary repository:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Mirror:** [GitHub](https://github.com/pkg-ru/imager-client)
 
+> **Demo:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager) — example of the microservice and client part in action
+
 ## Documentation: [RU](../README.md) / **EN**
 
 - [Python](./PY-EN.md) — package on [PyPI](https://pypi.org/project/imager_client/)
@@ -119,7 +121,7 @@ await server.AdminGenerate("/test.gif", true);
 ### Go
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
+import imager "gitverse.ru/pkg-ru/imager-client/v2"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",
@@ -165,11 +167,30 @@ url := i.GetAssetPath("/test.gif", "200x200", "webp")
 ```text
 2        # variants without suffix and @2
 "3"      # digit string: no suffix, @2, @3
-1        # single variant with dpr: 1 field
+1        # single variant without dpr field (1x is the default descriptor)
 0        # dpr not used
 > 3      # treated as 3
 — not set  # → imager settings (dpr)
 ```
+
+### srcset — w-mode (sizes) / x-mode (dpr)
+
+```text
+sizes: "..."   # w-mode: w-descriptors (200w, 400w); 'x'-paths (original size)
+               # are excluded from srcset — the original stays only in `src` of `<img>` as a fallback
+— no sizes     # x-mode: x-descriptors (1x, 2x, 3x); 'x'-paths — max+1 heuristic:
+               # max_dpr is computed ONLY from sized paths (width/height);
+               # dpr fields of 'x'-paths do not participate.
+               # If sized paths exist — descriptor = (max_dpr + 1) × dpr step
+               # (approximate, since the real original size is unknown);
+               # if there are no sized paths but dpr steps exist (dprs ≥ 2) —
+               # descriptor = dpr step (1x, 2x, 3x...);
+               # if there are neither sized paths nor dpr steps (dprs = 0) —
+               # the path goes into srcset without a descriptor (just the path, no 1x).
+```
+
+- `<source>` always has `srcset` (never `src`), even with a single path in the group; if srcset is empty — `<source>` is not rendered.
+- `<img>`: `srcset` is added only if there are more than 1 path **and** srcset is not empty; otherwise `<img>` has only `src`.
 
 ### Examples of different call styles
 

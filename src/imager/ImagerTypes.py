@@ -1,10 +1,4 @@
-"""Типы и структуры клиентской библиотеки imager.
-
-Содержит:
-- TypedDict-структуры AssetPath / AssetType (результаты клиентских методов);
-- TypedDict ImagerOptions / ImagerServerOptions (настройки конструктора);
-- псевдонимы Segment и список MIME-типов по формату.
-"""
+"""Типы и структуры клиентской библиотеки imager."""
 from __future__ import annotations
 
 from typing import List, TypedDict, Union
@@ -19,11 +13,7 @@ __all__ = [
 
 
 class AssetPath(TypedDict, total=False):
-    """Один вариант ассета внутри `paths`.
-
-    Все поля опциональны (`total=False`): включаются в сериализацию
-    только если заданы, в порядке path, dpr, width, height.
-    """
+    """Один вариант ассета внутри paths."""
 
     path: str
     dpr: Union[int, float]
@@ -32,19 +22,14 @@ class AssetPath(TypedDict, total=False):
 
 
 class _AssetTypeRequired(TypedDict):
-    """Обязательные поля AssetType (порядок ключей: type, paths)."""
+    """Обязательные поля AssetType."""
 
     type: str
     paths: List[AssetPath]
 
 
 class AssetType(_AssetTypeRequired, total=False):
-    """Результат GetAsset / элемента GetAssets.
-
-    Опциональные поля (в JSON включаются только при true):
-        source_format — итоговый формат совпадает с исходным форматом файла;
-        all_support   — формат поддерживается всеми браузерами (jpg/jpeg/gif/png).
-    """
+    """Результат GetAsset / элемента GetAssets."""
 
     source_format: bool
     all_support: bool
@@ -60,17 +45,18 @@ class ImagerOptions(TypedDict, total=False):
 
 
 class ImagerServerOptions(ImagerOptions, total=False):
-    """Настройки серверной части (добавляет token и adminURL)."""
+    """Настройки серверной части."""
 
     token: str
     adminURL: str
 
 
-#: строка / {width,height} / [width,height]
 Segment = Union[str, dict, list, tuple]
 
+
 def mime_for(format: str) -> str:
-    """MIME для итогового формата; неизвестный/видео → пустая строка."""
+    """MIME для итогового формата."""
+
     if format == "jpg":
-        format = 'jpeg'
+        return "image/jpeg"
     return "image/" + format

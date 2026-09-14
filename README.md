@@ -6,6 +6,8 @@
 
 > **Основной репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Зеркало:** [GitHub](https://github.com/pkg-ru/imager-client)
 
+> **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager) — пример работы микросервиса и клиентской части
+
 ## Документация: **RU** / [EN](./doc/README-EN.md)
 
 - [Python](./doc/PY-RU.md) — пакет на [PyPI](https://pypi.org/project/imager_client/)
@@ -126,7 +128,7 @@ await server.AdminGenerate("/test.gif", true);
 ### Go
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
+import imager "gitverse.ru/pkg-ru/imager-client/v2"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",
@@ -172,11 +174,30 @@ url := i.GetAssetPath("/test.gif", "200x200", "webp")
 ```text
 2        # варианты без суффикса и @2
 "3"      # строка-цифра: без суффикса, @2, @3
-1        # один вариант с полем dpr: 1
+1        # один вариант без поля dpr (1x — дефолтный дескриптор)
 0        # dpr не используется
 > 3      # трактуется как 3
 — не задан # → настройки imager (dpr)
 ```
+
+### srcset — w-режим (sizes) / x-режим (dpr)
+
+```text
+sizes: "..."   # w-режим: w-дескрипторы (200w, 400w); 'x'-пути (оригинальный размер)
+               # в srcset не попадают — оригинал остаётся только в src у <img> как fallback
+— без sizes    # x-режим: x-дескрипторы (1x, 2x, 3x); 'x'-пути — эвристика max+1:
+               # max_dpr вычисляется ТОЛЬКО из размерных путей (width/height);
+               # dpr-поля 'x'-путей в расчёт не участвуют.
+               # Если размерные пути есть — дескриптор = (max_dpr + 1) × dpr-шаг
+               # (приблизительный, т.к. реальный размер оригинала неизвестен);
+               # если размерных путей нет, но есть dpr-шаги (dprs ≥ 2) —
+               # дескриптор = dpr-шаг (1x, 2x, 3x...);
+               # если нет ни размерных путей, ни dpr-шагов (dprs = 0) —
+               # путь в srcset без дескриптора (просто путь, без 1x).
+```
+
+- `<source>` всегда содержит `srcset` (никогда `src`), даже при одном пути в группе; при пустом srcset `<source>` не выводится.
+- `<img>`: `srcset` добавляется только если путей > 1 **и** srcset не пуст; иначе у `<img>` только `src`.
 
 ### Примеры разных вариантов вызова
 

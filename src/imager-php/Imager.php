@@ -4,118 +4,86 @@ declare(strict_types=1);
 
 namespace imagerClient;
 
-/**
- * Imager — клиент микросервиса imager (PHP-реализация).
- *
- * Клиентская часть (GetAsset/GetAssets/GetAssetPath) — чистое построение
- * путей/URL без HTTP, без валидации и исключений, только конкатенация строк.
- * Админ-часть (AdminGenerate/AdminDelete) — стандартный HTTP-клиент (curl),
- * результат — bool по маппингу кодов ответа.
- *
- * Настройки:
- *   token    — токен админ-методов (только AdminGenerate/AdminDelete);
- *   dpr      — итоговое dpr по умолчанию (0 — не используется);
- *   format   — формат генерации по умолчанию ("");
- *   formats  — список форматов по умолчанию ([] → используется `format`);
- *   baseURL  — база URL ассетов, нормализована (всегда с `/` на конце);
- *   adminURL — база админ-API (без завершающего `/`).
- */
 final class Imager
 {
-    /** @var string */
-    private $token = "";
-    /** @var int */
-    private $dpr = 0;
-    /** @var string */
-    private $format = "";
+    private string $token = '';
+    private int $dpr = 0;
+    private string $format = '';
     /** @var string[] */
-    private $formats = [];
-    /** @var string */
-    private $baseURL = "/";
-    /** @var string */
-    private $adminURL = "";
+    private array $formats = [];
+    private string $baseURL = '/';
+    private string $adminURL = '';
 
-    /**
-     * @param array|null $options настройки
-     */
+    private const IMG_ATTRS = [
+        'alt' => true,
+        'sizes' => true,
+        'loading' => true,
+        'width' => true,
+        'height' => true,
+        'decoding' => true,
+        'fetchpriority' => true,
+    ];
+
+    private const ALL_SUPPORT = [
+        'jpg' => true,
+        'jpeg' => true,
+        'gif' => true,
+        'png' => true,
+    ];
+
     public function __construct($options = null)
     {
-        $options = is_array($options) ? $options : [];
+        if (!is_array($options)) {
+            $options = [];
+        }
 
-        // token
         $token = $options['token'] ?? null;
-        $this->token = $token !== null ? (string)$token : "";
+        $this->token = $token !== null ? (string) $token : '';
 
-        // dpr
         $dpr = $options['dpr'] ?? null;
-        $this->dpr = $dpr !== null ? (int)$dpr : 0;
+        $this->dpr = $dpr !== null ? (int) $dpr : 0;
 
-        // format
-        $fmt = $options['format'] ?? null;
-        $this->format = $fmt !== null ? (string)$fmt : "";
+        $format = $options['format'] ?? null;
+        $this->format = $format !== null ? (string) $format : '';
 
-        // formats
         $formats = $options['formats'] ?? null;
-        if ($formats === null) {
-            $this->formats = [];
-        } else {
-            $this->formats = [];
-            foreach ((array)$formats as $f) {
-                $this->formats[] = (string)$f;
+        if ($formats !== null) {
+            foreach ((array) $formats as $f) {
+                $this->formats[] = (string) $f;
             }
         }
 
-        // baseURL — нормализация «…/» в конце
         $baseURL = $options['baseURL'] ?? null;
-        if ($baseURL === null || $baseURL === "") {
-            $this->baseURL = "/";
-        } else {
-            $baseURL = (string)$baseURL;
-            $this->baseURL = substr($baseURL, -1) === "/" ? $baseURL : $baseURL . "/";
+        if ($baseURL !== null && $baseURL !== '') {
+            $baseURL = (string) $baseURL;
+            $this->baseURL = substr($baseURL, -1) === '/' ? $baseURL : $baseURL . '/';
         }
 
-        // adminURL — без завершающего `/`
         $adminURL = $options['adminURL'] ?? null;
-        if ($adminURL === null || $adminURL === "") {
-            $this->adminURL = "";
-        } else {
-            $this->adminURL = rtrim((string)$adminURL, '/');
+        if ($adminURL !== null && $adminURL !== '') {
+            $this->adminURL = rtrim((string) $adminURL, '/');
         }
     }
 
-    // ------------------------------------------------------------------ //
-    //  Разбор source: (path, source_name, source_format)     //
-    // ------------------------------------------------------------------ //
-
-    /**
-     * Отбрасывает ведущий `/`, отделяет path и расширение (в lower-case).
-     *
-     * @return array{0:string,1:string,2:string}
-     */
+    /** @return array{0:string,1:string,2:string} */
     private static function splitSource(string $source): array
     {
-        $source = (string)$source;
-        $source = ltrim($source, "/");
-
-        $lastSlash = strrpos($source, "/");
-        if ($lastSlash !== false) {
+        $source = ltrim($source, '/');
+        $lastSlash = strrpos($source, '/');
+        if ($lastSlash === false) {
+            $path = '';
+            $file = $source;
+        } else {
             $path = substr($source, 0, $lastSlash);
             $file = substr($source, $lastSlash + 1);
-        } else {
-            $path = "";
-            $file = $source;
         }
 
-        $lastDot = strrpos($file, ".");
-        if ($lastDot !== false) {
-            $sourceName = substr($file, 0, $lastDot);
-            $sourceFormat = strtolower(substr($file, $lastDot + 1));
-        } else {
-            $sourceName = $file;
-            $sourceFormat = "";
+        $lastDot = strrpos($file, '.');
+        if ($lastDot === false) {
+            return [$path, $file, ''];
         }
 
-        return [$path, $sourceName, $sourceFormat];
+        return [$path, substr($file, 0, $lastDot), strtolower(substr($file, $lastDot + 1))];
     }
 
     // ------------------------------------------------------------------ //
@@ -128,99 +96,65 @@ final class Imager
     private static function buildSize(int $width, int $height): string
     {
         if ($width > 0) {
-            if ($height > 0) {
-                return $width . "x" . $height;
-            }
-            return $width . "x";
+            return $height > 0 ? $width . 'x' . $height : $width . 'x';
         }
-        if ($height > 0) {
-            return "x" . $height;
-        }
-        return "x";
+        return $height > 0 ? 'x' . $height : 'x';
     }
 
-    /**
-     * → [is_size, width, height] — один проход по строке.
-     *
-     * @return array{0:bool,1:int,2:int}
-     */
+    /** @return array{0:bool,1:int,2:int} */
     private static function parseSizeString(string $segment): array
     {
-        $pos = strpos($segment, "x");
+        $pos = strpos($segment, 'x');
         if ($pos === false) {
             return [false, 0, 0];
         }
+
         $left = substr($segment, 0, $pos);
         $right = substr($segment, $pos + 1);
-        if (($left === "" || ctype_digit($left)) && ($right === "" || ctype_digit($right))) {
-            $width = $left !== "" ? (int)$left : 0;
-            $height = $right !== "" ? (int)$right : 0;
-            return [true, $width, $height];
+        if (($left === '' || ctype_digit($left)) && ($right === '' || ctype_digit($right))) {
+            return [true, $left === '' ? 0 : (int) $left, $right === '' ? 0 : (int) $right];
         }
         return [false, 0, 0];
     }
 
-    /**
-     * → [segment_str, is_size, width, height].
-     *
-     * @param mixed $segment
-     *
-     * @return array{0:string,1:bool,2:int,3:int}
-     */
+    /** @return array{0:string,1:bool,2:int,3:int} */
     private static function normalizeSegment($segment): array
     {
         if ($segment === null) {
-            return ["x", true, 0, 0];
+            return ['x', true, 0, 0];
         }
+
         if (is_string($segment)) {
             [$isSize, $width, $height] = self::parseSizeString($segment);
-            if ($isSize) {
-                return [$segment, true, $width, $height];
-            }
-            return [$segment, false, 0, 0];
+            return $isSize ? [$segment, true, $width, $height] : [$segment, false, 0, 0];
         }
-        if (is_array($segment) && !array_is_list($segment)) {
-            $width = isset($segment['width']) && $segment['width'] !== null ? (int)$segment['width'] : 0;
-            $height = isset($segment['height']) && $segment['height'] !== null ? (int)$segment['height'] : 0;
-            return [self::buildSize($width, $height), true, $width, $height];
-        }
+
         if (is_array($segment)) {
-            $width = (isset($segment[0]) && $segment[0] !== null) ? (int)$segment[0] : 0;
-            $height = (isset($segment[1]) && $segment[1] !== null) ? (int)$segment[1] : 0;
+            if (!array_is_list($segment)) {
+                $width = isset($segment['width']) && $segment['width'] !== null ? (int) $segment['width'] : 0;
+                $height = isset($segment['height']) && $segment['height'] !== null ? (int) $segment['height'] : 0;
+            } else {
+                $width = isset($segment[0]) && $segment[0] !== null ? (int) $segment[0] : 0;
+                $height = isset($segment[1]) && $segment[1] !== null ? (int) $segment[1] : 0;
+            }
             return [self::buildSize($width, $height), true, $width, $height];
         }
-        // прочие типы → размер без размеров
-        return ["x", true, 0, 0];
+
+        return ['x', true, 0, 0];
     }
 
-    // ------------------------------------------------------------------ //
-    //  dpr                                                   //
-    // ------------------------------------------------------------------ //
-
-    /**
-     * Строка-цифра → число; < 1 → 0 (не используется); > 3 → 3.
-     */
     private static function parseDpr($dpr): int
     {
-        $number = (int)$dpr;
+        $number = (int) $dpr;
         if ($number < 1) {
             return 0;
         }
-        if ($number > 3) {
-            return 3;
-        }
-        return $number;
+        return $number > 3 ? 3 : $number;
     }
 
-    /**
-     * Аргумент → настройки → 0.
-     */
     private function resolveDpr($dpr): int
     {
-        if ($dpr !== null) {
-            return self::parseDpr($dpr);
-        }
-        return self::parseDpr($this->dpr);
+        return self::parseDpr($dpr !== null ? $dpr : $this->dpr);
     }
 
     // ------------------------------------------------------------------ //
@@ -236,37 +170,29 @@ final class Imager
      */
     public function GetAsset($source, $segment = null, $format = null, $dpr = null): AssetType
     {
-        [$path, $sourceName, $sourceFormat] = self::splitSource((string)$source);
+        [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
         [$segStr, $isSize, $width, $height] = self::normalizeSegment($segment);
+        $outFormat = ($format !== null && $format !== '') ? (string) $format : ($this->format !== '' ? $this->format : $sourceFormat);
+        $dprVal = self::parseDpr($dpr !== null ? $dpr : $this->dpr);
 
-        $outFormat = $format !== null && $format !== "" ? (string)$format : $this->format;
-        if ($outFormat === "") {
-            $outFormat = $sourceFormat;
-        }
+        $name = $sourceFormat !== '' ? $sourceName . '-' . $sourceFormat : $sourceName;
+        $prefix = $path !== '' ? $this->baseURL . $path . '/' . $name . '/' : $this->baseURL . $name . '/';
 
-        $dprVal = $this->resolveDpr($dpr);
-        $explicit = $dpr !== null;
-
-        // --- Инварианты, вычисляемые ОДИН раз ---
-        $name = $sourceFormat !== "" ? $sourceName . "-" . $sourceFormat : $sourceName;
-        $prefix = $path !== "" ? $this->baseURL . $path . "/" . $name . "/" : $this->baseURL . $name . "/";
-
-        // dpr — целевое значение: формирует ровно один вариант ассета
         $item = new AssetPath();
         if ($dprVal >= 2) {
-            $item->path = $prefix . $segStr . "@" . $dprVal . "." . $outFormat;
+            $item->path = $prefix . $segStr . '@' . $dprVal . '.' . $outFormat;
             $item->dpr = $dprVal;
         } else {
-            $item->path = $prefix . $segStr . "." . $outFormat;
-            if ($explicit && $dprVal == 1) {
-                $item->dpr = 1;
+            $item->path = $prefix . $segStr . '.' . $outFormat;
+        }
+
+        if ($isSize) {
+            if ($width > 0) {
+                $item->width = $dprVal >= 2 ? $width * $dprVal : $width;
             }
-        }
-        if ($isSize && $width > 0) {
-            $item->width = $dprVal >= 2 ? $width * $dprVal : $width;
-        }
-        if ($isSize && $height > 0) {
-            $item->height = $dprVal >= 2 ? $height * $dprVal : $height;
+            if ($height > 0) {
+                $item->height = $dprVal >= 2 ? $height * $dprVal : $height;
+            }
         }
 
         $result = new AssetType();
@@ -282,7 +208,7 @@ final class Imager
     }
 
     /**
-     * Декартово произведение segments × formats.
+     * Сгруппированные ассеты по типу
      *
      * @param mixed $segments Segment | Segment[] | null
      * @param mixed $formats  string | string[] | null
@@ -292,7 +218,6 @@ final class Imager
      */
     public function GetAssets($source, $segments = null, $formats = null, $dprs = null): array
     {
-        // segments: не задан → [None] → "x"
         if ($segments === null) {
             $segList = [null];
         } elseif (is_array($segments) && array_is_list($segments)) {
@@ -301,116 +226,139 @@ final class Imager
             $segList = [$segments];
         }
 
-        // formats: аргумент → настройки formats → format → [исходный]
         $fmtList = [];
         if ($formats !== null) {
             if (is_string($formats)) {
-                $fmtList = $formats !== "" ? [$formats] : [];
+                if ($formats !== '') {
+                    $fmtList[] = $formats;
+                }
             } elseif (is_array($formats)) {
                 foreach ($formats as $f) {
-                    $fmtList[] = (string)$f;
-                }
-                if (count($formats) === 0) {
-                    $fmtList = [];
+                    $fmtList[] = (string) $f;
                 }
             }
         }
-        $sourceParts = self::splitSource((string)$source);
-        [, , $sourceFormat] = $sourceParts;
+
+        [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
         if (!$fmtList) {
             if ($this->formats) {
                 $fmtList = $this->formats;
-            } elseif ($this->format !== "") {
+            } elseif ($this->format !== '') {
                 $fmtList = [$this->format];
             } else {
-                $fmtList = $sourceFormat !== "" ? [$sourceFormat] : [""];
+                $fmtList = $sourceFormat !== '' ? [$sourceFormat] : [''];
             }
         }
 
         $dprVal = $this->resolveDpr($dprs);
-        $explicit = $dprs !== null;
+        $maxSteps = $dprVal === 2 ? 2 : ($dprVal >= 3 ? 3 : 1);
 
-        // --- Инварианты, вычисляемые ОДИН раз на весь вызов ---
-        // 1. Префикс URL {baseURL}{path}/{name}-{srcfmt}/ — одинаков для всех путей.
-        [$path, $sourceName] = $sourceParts;
-        $name = $sourceFormat !== "" ? $sourceName . "-" . $sourceFormat : $sourceName;
-        $prefix = $path !== "" ? $this->baseURL . $path . "/" . $name . "/" : $this->baseURL . $name . "/";
-        // 2. Суффиксы dpr: [без суффикса, @2, @3] — константы.
-        $maxSteps = $dprVal == 2 ? 2 : ($dprVal >= 3 ? 3 : 1);
+        $name = $sourceFormat !== '' ? $sourceName . '-' . $sourceFormat : $sourceName;
+        $prefix = $path !== '' ? $this->baseURL . $path . '/' . $name . '/' : $this->baseURL . $name . '/';
 
-        // Пути всех сегментов по каждому формату (сегмент-мажорно).
-        $pathsByFmt = [];
-        foreach ($fmtList as $fmt) {
-            $pathsByFmt[] = [];
-        }
+        $normalizedSegments = [];
+        $baseWidth = 0;
+        $baseHeight = 0;
         foreach ($segList as $seg) {
-            [$segStr, $isSize, $width, $height] = self::normalizeSegment($seg);
-            // Базы URL для шагов 1..3: {prefix}{segStr}[@2|@3]. — один раз на segment.
-            $bases = [
-                $prefix . $segStr . ".",
-                $prefix . $segStr . "@2.",
-                $prefix . $segStr . "@3.",
-            ];
-            foreach ($fmtList as $fi => $fmt) {
-                $effectiveFmt = $fmt !== "" ? $fmt : $sourceFormat;
-                for ($step = 1; $step <= $maxSteps; $step++) {
-                    $url = $bases[$step - 1] . $effectiveFmt;
+            $normalized = self::normalizeSegment($seg);
+            $normalizedSegments[] = $normalized;
+            if ($baseWidth === 0 && $normalized[2] > 0) {
+                $baseWidth = $normalized[2];
+            }
+            if ($baseHeight === 0 && $normalized[3] > 0) {
+                $baseHeight = $normalized[3];
+            }
+        }
 
-                    $item = new AssetPath();
-                    $item->path = $url;
-                    if ($dprVal == 1 && $explicit) {
-                        $item->dpr = 1;
-                    } elseif ($step >= 2) {
-                        $item->dpr = $step;
+        $hasGt1 = false;
+        if ($baseWidth > 0 || $baseHeight > 0) {
+            foreach ($normalizedSegments as $normalized) {
+                $width = $normalized[2];
+                $height = $normalized[3];
+                if ($width > 0 && $baseWidth > 0) {
+                    $ratio = $width / $baseWidth;
+                    if ($ratio * $maxSteps > 1) {
+                        $hasGt1 = true;
+                        break;
                     }
-                    if ($isSize && $width > 0) {
-                        $multiply = $step >= 2 ? $step : 1;
-                        $item->width = $width * $multiply;
+                } elseif ($height > 0 && $baseHeight > 0) {
+                    $ratio = $height / $baseHeight;
+                    if ($ratio * $maxSteps > 1) {
+                        $hasGt1 = true;
+                        break;
                     }
-                    if ($isSize && $height > 0) {
-                        $multiply = $step >= 2 ? $step : 1;
-                        $item->height = $height * $multiply;
-                    }
-                    $pathsByFmt[$fi][] = $item;
                 }
             }
         }
 
-        // dpr из фактических размеров: базовая ширина = ширина первого
-        // участника с известной шириной; dpr = фактическая ширина / базовая.
-        // Если ширины нет — по высоте; если ни того, ни другого — без dpr.
-        // Целый результат → int (для единой JSON-сериализации с TS).
-        $result = [];
-        foreach ($fmtList as $fi => $fmt) {
-            $effectiveFmt = $fmt !== "" ? $fmt : $sourceFormat;
-            $paths = $pathsByFmt[$fi];
-            $baseWidth = 0;
-            $baseHeight = 0;
-            foreach ($paths as $item) {
-                if ($baseWidth === 0 && $item->width !== null && $item->width > 0) {
-                    $baseWidth = $item->width;
-                }
-                if ($baseHeight === 0 && $item->height !== null && $item->height > 0) {
-                    $baseHeight = $item->height;
-                }
-            }
-            foreach ($paths as $item) {
-                if ($baseWidth > 0 && $item->width !== null && $item->width > 0) {
-                    $dpr = $item->width / $baseWidth;
-                    $item->dpr = $dpr == (int)$dpr ? (int)$dpr : $dpr;
-                } elseif ($baseHeight > 0 && $item->height !== null && $item->height > 0) {
-                    $dpr = $item->height / $baseHeight;
-                    $item->dpr = $dpr == (int)$dpr ? (int)$dpr : $dpr;
-                }
-            }
+        // Формат вычисляется один раз; дальше hot loop работает только с готовыми строками.
+        $effectiveFormats = [];
+        $mimes = [];
+        $sourceFlags = [];
+        $supportFlags = [];
+        foreach ($fmtList as $fmt) {
+            $effective = $fmt !== '' ? $fmt : $sourceFormat;
+            $effectiveFormats[] = $effective;
+            $mimes[] = mime_for($effective);
+            $sourceFlags[] = $effective === $sourceFormat;
+            $supportFlags[] = isset(self::ALL_SUPPORT[$effective]);
+        }
 
+        $formatCount = count($effectiveFormats);
+        $pathsByFormat = array_fill(0, $formatCount, []);
+
+        foreach ($normalizedSegments as $normalized) {
+            [$segStr, $isSize, $width, $height] = $normalized;
+
+            for ($step = 1; $step <= $maxSteps; ++$step) {
+                $mult = $step >= 2 ? $step : 1;
+                $scaledWidth = $isSize && $width > 0 ? $width * $mult : null;
+                $scaledHeight = $isSize && $height > 0 ? $height * $mult : null;
+                $dpr = $step >= 2 ? $step : null;
+                $isDimensional = $scaledWidth !== null || $scaledHeight !== null;
+                if ($isDimensional) {
+                    if ($scaledWidth !== null && $baseWidth > 0) {
+                        $dpr = $scaledWidth / $baseWidth;
+                    } elseif ($scaledHeight !== null && $baseHeight > 0) {
+                        $dpr = $scaledHeight / $baseHeight;
+                    } else {
+                        $dpr = null;
+                    }
+                    if ($dpr !== null && $dpr == (int) $dpr) {
+                        $dpr = (int) $dpr;
+                    }
+                    if ($dpr === 1 && !$hasGt1) {
+                        $dpr = null;
+                    }
+                }
+
+                $segmentBase = $prefix . $segStr . ($step >= 2 ? '@' . $step : '') . '.';
+                for ($fi = 0; $fi < $formatCount; ++$fi) {
+                    $item = new AssetPath();
+                    $item->path = $segmentBase . $effectiveFormats[$fi];
+                    if ($dpr !== null) {
+                        $item->dpr = $dpr;
+                    }
+                    if ($scaledWidth !== null) {
+                        $item->width = $scaledWidth;
+                    }
+                    if ($scaledHeight !== null) {
+                        $item->height = $scaledHeight;
+                    }
+                    $pathsByFormat[$fi][] = $item;
+                }
+            }
+        }
+
+        $result = [];
+        for ($fi = 0; $fi < $formatCount; ++$fi) {
             $asset = new AssetType();
-            $asset->type = mime_for($effectiveFmt);
-            $asset->paths = $paths;
-            if ($effectiveFmt === $sourceFormat) {
+            $asset->type = $mimes[$fi];
+            $asset->paths = $pathsByFormat[$fi];
+            if ($sourceFlags[$fi]) {
                 $asset->source_format = true;
             }
-            if ($effectiveFmt === 'jpg' || $effectiveFmt === 'jpeg' || $effectiveFmt === 'gif' || $effectiveFmt === 'png') {
+            if ($supportFlags[$fi]) {
                 $asset->all_support = true;
             }
             $result[] = $asset;
@@ -419,48 +367,29 @@ final class Imager
         return $result;
     }
 
-    // ------------------------------------------------------------------ //
-    //  HTML-генерация (GetAssetsHtml)                                    //
-    // ------------------------------------------------------------------ //
-
-    /** @var array<int, string> атрибуты, относящиеся к <img>, а не к <picture> */
-    private const IMG_ATTRS = ['alt', 'sizes', 'loading', 'width', 'height', 'decoding', 'fetchpriority'];
-
-    /**
-     * Экранирование значения HTML-атрибута.
-     */
     private static function htmlEscape($value): string
     {
-        return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    /**
-     * Число → строка дескриптора: 1 → "1", 1.5 → "1.5" (без хвостовых нулей).
-     */
     private static function fmtDescriptor($value): string
     {
-        if ((float)$value === (float)(int)$value) {
-            return (string)(int)$value;
+        if ((float) $value === (float) (int) $value) {
+            return (string) (int) $value;
         }
-        $s = number_format((float)$value, 2, '.', '');
-        $s = rtrim($s, '0');
-        return rtrim($s, '.');
+        $s = number_format((float) $value, 2, '.', '');
+        return rtrim(rtrim($s, '0'), '.');
     }
 
-    /**
-     * srcset для списка путей одного типа.
-     *
-     * useWidth → w-дескрипторы по AssetPath.width; иначе dpr-дескрипторы:
-     * из AssetPath.dpr, а если dpr нет — из отношения height (или width)
-     * к базовому (первому) значению (дробные допустимы).
-     *
-     * @param AssetPath[] $paths
-     */
+    /** @param AssetPath[] $paths */
     private static function buildSrcset(array $paths, bool $useWidth): string
     {
         $baseWidth = 0;
         $baseHeight = 0;
-        foreach ($paths as $item) {
+        $count = count($paths);
+
+        for ($i = 0; $i < $count; ++$i) {
+            $item = $paths[$i];
             if ($baseWidth === 0 && $item->width !== null && $item->width > 0) {
                 $baseWidth = $item->width;
             }
@@ -468,32 +397,83 @@ final class Imager
                 $baseHeight = $item->height;
             }
         }
+
+        if ($useWidth) {
+            $parts = [];
+            for ($i = 0; $i < $count; ++$i) {
+                $item = $paths[$i];
+                if ($item->width === null || $item->width === 0) {
+                    continue;
+                }
+                $parts[] = $item->path . ' ' . $item->width . 'w';
+            }
+            return implode(', ', $parts);
+        }
+
+        $maxDpr = 0.0;
+        $hasDpr = false;
+        for ($i = 0; $i < $count; ++$i) {
+            $item = $paths[$i];
+            if ($item->dpr !== null && $item->dpr > 0) {
+                $hasDpr = true;
+            }
+            if (($item->width === null || $item->width === 0)
+                && ($item->height === null || $item->height === 0)) {
+                continue;
+            }
+
+            if ($item->dpr !== null && $item->dpr > 0) {
+                $dpr = (float) $item->dpr;
+            } elseif ($item->width !== null && $item->width > 0 && $baseWidth > 0) {
+                $dpr = (float) $item->width / (float) $baseWidth;
+            } elseif ($item->height !== null && $item->height > 0 && $baseHeight > 0) {
+                $dpr = (float) $item->height / (float) $baseHeight;
+            } else {
+                continue;
+            }
+            if ($dpr > $maxDpr) {
+                $maxDpr = $dpr;
+            }
+        }
+
         $parts = [];
-        foreach ($paths as $item) {
-            if ($useWidth && $item->width !== null && $item->width > 0) {
-                $desc = $item->width . 'w';
-            } elseif ($item->dpr !== null && $item->dpr > 0) {
+        for ($i = 0; $i < $count; ++$i) {
+            $item = $paths[$i];
+
+            if ($item->dpr !== null && $item->dpr > 0
+                && (($item->width !== null && $item->width > 0) || ($item->height !== null && $item->height > 0))) {
                 $desc = self::fmtDescriptor($item->dpr) . 'x';
             } elseif ($baseHeight > 0 && $item->height !== null && $item->height > 0) {
-                $desc = self::fmtDescriptor($item->height / $baseHeight) . 'x';
+                $desc = self::fmtDescriptor(round($item->height / $baseHeight, 2)) . 'x';
             } elseif ($baseWidth > 0 && $item->width !== null && $item->width > 0) {
-                $desc = self::fmtDescriptor($item->width / $baseWidth) . 'x';
+                $desc = self::fmtDescriptor(round($item->width / $baseWidth, 2)) . 'x';
+            } elseif (($item->width === null || $item->width === 0)
+                && ($item->height === null || $item->height === 0)) {
+                $dprStep = ($item->dpr !== null && $item->dpr > 0) ? $item->dpr : 1;
+                if ($maxDpr > 0) {
+                    $desc = self::fmtDescriptor(round(($maxDpr + 1) * $dprStep, 2)) . 'x';
+                } elseif ($hasDpr) {
+                    $desc = self::fmtDescriptor($dprStep) . 'x';
+                } else {
+                    $parts[] = $item->path;
+                    continue;
+                }
             } else {
                 $desc = '1x';
             }
+
             $parts[] = $item->path . ' ' . $desc;
         }
+
         return implode(', ', $parts);
     }
 
-    /**
-     * Рендер атрибутов: true → имя без значения, false → пропуск, иначе name="value".
-     *
-     * @param array<string, mixed> $attrs
-     */
+    /** @param array<string,mixed> $attrs */
     private static function renderAttrs(array $attrs): string
     {
-        ksort($attrs);
+        if (!$attrs) {
+            return '';
+        }
         $out = '';
         foreach ($attrs as $name => $value) {
             if ($value === true) {
@@ -508,7 +488,7 @@ final class Imager
     }
 
     /**
-     * HTML <picture>/<img> по декартову произведению segments × formats.
+     * HTML <picture>/<img> по сгруппированным сегментам.
      *
      * options — HTML-атрибуты: class/id/... → <picture>,
      * alt/sizes/loading (lazy → loading="lazy") → <img>.
@@ -520,71 +500,172 @@ final class Imager
      */
     public function GetAssetsHtml($source, $segments = null, $formats = null, $dprs = null, $options = null): string
     {
-        $assets = $this->GetAssets($source, $segments, $formats, $dprs);
-        if (!$assets) {
-            return "";
+        if ($segments === null) {
+            $segList = [null];
+        } elseif (is_array($segments) && array_is_list($segments)) {
+            $segList = $segments;
+        } else {
+            $segList = [$segments];
         }
+
+        $fmtList = [];
+        if ($formats !== null) {
+            if (is_string($formats)) {
+                if ($formats !== '') {
+                    $fmtList[] = $formats;
+                }
+            } elseif (is_array($formats)) {
+                foreach ($formats as $f) {
+                    $fmtList[] = (string) $f;
+                }
+            }
+        }
+
+        [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
+        if (!$fmtList) {
+            if ($this->formats) {
+                $fmtList = $this->formats;
+            } elseif ($this->format !== '') {
+                $fmtList = [$this->format];
+            } else {
+                $fmtList = $sourceFormat !== '' ? [$sourceFormat] : [''];
+            }
+        }
+
+        $dprVal = $this->resolveDpr($dprs);
+        $maxSteps = $dprVal === 2 ? 2 : ($dprVal >= 3 ? 3 : 1);
 
         $options = is_array($options) ? $options : [];
         $useWidth = array_key_exists('sizes', $options) && $options['sizes'] !== null;
 
-        // lazy → loading="lazy"
-        if (!empty($options['lazy'])) {
-            if (!isset($options['loading']) || $options['loading'] === null) {
-                $options['loading'] = 'lazy';
-            }
+        if (!empty($options['lazy']) && (!isset($options['loading']) || $options['loading'] === null)) {
+            $options['loading'] = 'lazy';
         }
         unset($options['lazy']);
 
-        // явные img-атрибуты (приоритет над перенаправленными)
         $explicit = is_array($options['imgAttrs'] ?? null) ? $options['imgAttrs'] : [];
         unset($options['imgAttrs']);
 
-        // Разделение атрибутов: img-атрибуты vs атрибуты <picture>
-        // (ksort в renderAttrs — детерминированный порядок вывода)
         $imgAttrs = [];
         $picAttrs = [];
         foreach ($options as $key => $value) {
-            if (in_array($key, self::IMG_ATTRS, true)) {
+            if (isset(self::IMG_ATTRS[$key])) {
                 $imgAttrs[$key] = $value;
             } else {
                 $picAttrs[$key] = $value;
             }
         }
-        // merge: перенаправленные + явные (явные имеют приоритет)
         foreach ($explicit as $key => $value) {
             $imgAttrs[$key] = $value;
         }
 
-        // Группировка по типу (формату): пути всех сегментов одного формата
-        // объединяются в один srcset внутри одного <source>/<img>.
-        $groups = [];
-        $byType = [];
-        foreach ($assets as $asset) {
-            $mime = $asset->type;
-            if (!isset($byType[$mime])) {
-                $byType[$mime] = [
-                    'type' => $mime,
-                    'paths' => [],
-                    'source_format' => false,
-                    'all_support' => false,
-                ];
-                $groups[] =& $byType[$mime];
+        $normalizedSegments = [];
+        $baseWidth = 0;
+        $baseHeight = 0;
+        foreach ($segList as $seg) {
+            $normalized = self::normalizeSegment($seg);
+            $normalizedSegments[] = $normalized;
+            if ($baseWidth === 0 && $normalized[2] > 0) {
+                $baseWidth = $normalized[2];
             }
-            foreach ($asset->paths as $p) {
-                $byType[$mime]['paths'][] = $p;
-            }
-            if ($asset->source_format === true) {
-                $byType[$mime]['source_format'] = true;
-            }
-            if ($asset->all_support === true) {
-                $byType[$mime]['all_support'] = true;
+            if ($baseHeight === 0 && $normalized[3] > 0) {
+                $baseHeight = $normalized[3];
             }
         }
-        unset($byType);
 
-        // Выбор группы для <img>:
-        // 1) source_format=true; 2) первая all_support=true; 3) последняя.
+        $hasGt1 = false;
+        if ($baseWidth > 0 || $baseHeight > 0) {
+            foreach ($normalizedSegments as $normalized) {
+                $width = $normalized[2];
+                $height = $normalized[3];
+                if ($width > 0 && $baseWidth > 0) {
+                    if (($width / $baseWidth) * $maxSteps > 1) {
+                        $hasGt1 = true;
+                        break;
+                    }
+                } elseif ($height > 0 && $baseHeight > 0) {
+                    if (($height / $baseHeight) * $maxSteps > 1) {
+                        $hasGt1 = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $prefixName = $sourceFormat !== '' ? $sourceName . '-' . $sourceFormat : $sourceName;
+        $prefix = $path !== ''
+            ? $this->baseURL . $path . '/' . $prefixName . '/'
+            : $this->baseURL . $prefixName . '/';
+
+        $groups = [];
+        $groupIndex = [];
+
+        foreach ($fmtList as $fmt) {
+            $effectiveFmt = $fmt !== '' ? $fmt : $sourceFormat;
+            $mime = mime_for($effectiveFmt);
+
+            if (isset($groupIndex[$mime])) {
+                $gi = $groupIndex[$mime];
+                if ($effectiveFmt === $sourceFormat) {
+                    $groups[$gi]['source_format'] = true;
+                }
+                if (isset(self::ALL_SUPPORT[$effectiveFmt])) {
+                    $groups[$gi]['all_support'] = true;
+                }
+            } else {
+                $gi = count($groups);
+                $groupIndex[$mime] = $gi;
+                $groups[] = [
+                    'type' => $mime,
+                    'paths' => [],
+                    'source_format' => $effectiveFmt === $sourceFormat,
+                    'all_support' => isset(self::ALL_SUPPORT[$effectiveFmt]),
+                ];
+            }
+
+            foreach ($normalizedSegments as $normalized) {
+                [$segStr, $isSize, $width, $height] = $normalized;
+
+                for ($step = 1; $step <= $maxSteps; ++$step) {
+                    $mult = $step >= 2 ? $step : 1;
+                    $scaledWidth = $isSize && $width > 0 ? $width * $mult : null;
+                    $scaledHeight = $isSize && $height > 0 ? $height * $mult : null;
+
+                    $item = new AssetPath();
+                    $item->path = $prefix . $segStr . ($step >= 2 ? '@' . $step : '') . '.' . $effectiveFmt;
+                    $itemDpr = $step >= 2 ? $step : null;
+                    if ($scaledWidth !== null && $baseWidth > 0) {
+                        $itemDpr = $scaledWidth / $baseWidth;
+                        $itemDpr = $itemDpr == (int) $itemDpr ? (int) $itemDpr : $itemDpr;
+                    } elseif ($scaledHeight !== null && $baseHeight > 0) {
+                        $itemDpr = $scaledHeight / $baseHeight;
+                        $itemDpr = $itemDpr == (int) $itemDpr ? (int) $itemDpr : $itemDpr;
+                    } elseif ($scaledWidth === null && $scaledHeight === null) {
+                        // Для x-путей исходный GetAssets сохраняет dpr шага (@2/@3).
+                    } else {
+                        $itemDpr = null;
+                    }
+                    if (($scaledWidth !== null || $scaledHeight !== null) && $itemDpr === 1 && !$hasGt1) {
+                        $itemDpr = null;
+                    }
+                    if ($itemDpr !== null) {
+                        $item->dpr = $itemDpr;
+                    }
+                    if ($scaledWidth !== null) {
+                        $item->width = $scaledWidth;
+                    }
+                    if ($scaledHeight !== null) {
+                        $item->height = $scaledHeight;
+                    }
+                    $groups[$gi]['paths'][] = $item;
+                }
+            }
+        }
+
+        if (!$groups) {
+            return '';
+        }
+
         $imgIndex = -1;
         foreach ($groups as $idx => $group) {
             if ($group['source_format']) {
@@ -607,31 +688,32 @@ final class Imager
         $imgPaths = $groups[$imgIndex]['paths'];
         $base = $imgPaths[0];
 
-        // <img>
         $img = ' src="' . self::htmlEscape($base->path) . '"';
-        if (count($imgPaths) > 1) {
-            $img .= ' srcset="' . self::htmlEscape(self::buildSrcset($imgPaths, $useWidth)) . '"';
+        $imgSrcset = self::buildSrcset($imgPaths, $useWidth);
+        if (count($imgPaths) > 1 && $imgSrcset !== '') {
+            $img .= ' srcset="' . self::htmlEscape($imgSrcset) . '"';
         }
-        ksort($imgAttrs);
-        foreach ($imgAttrs as $name => $value) {
-            if ($value === true) {
-                $img .= ' ' . $name;
-            } elseif ($value === false || $value === null) {
-                continue;
-            } else {
-                $img .= ' ' . $name . '="' . self::htmlEscape($value) . '"';
+
+        if ($imgAttrs) {
+            foreach ($imgAttrs as $name => $value) {
+                if ($value === true) {
+                    $img .= ' ' . $name;
+                } elseif ($value === false || $value === null) {
+                    continue;
+                } else {
+                    $img .= ' ' . $name . '="' . self::htmlEscape($value) . '"';
+                }
             }
         }
-        // width/height для CLS из базового path — только если пользователь
-        // не задал свои (напрямую или через imgAttrs): без дублирования.
+
         if ($base->width !== null && $base->width > 0 && !isset($imgAttrs['width'])) {
             $img .= ' width="' . $base->width . '"';
         }
         if ($base->height !== null && $base->height > 0 && !isset($imgAttrs['height'])) {
             $img .= ' height="' . $base->height . '"';
         }
-        $imgHtml = '<img' . $img . '>';
 
+        $imgHtml = '<img' . $img . '>';
         if (count($groups) === 1) {
             return $imgHtml;
         }
@@ -641,80 +723,47 @@ final class Imager
             if ($idx === $imgIndex) {
                 continue;
             }
-            $html .= "\n    " . '<source type="' . self::htmlEscape($group['type']) . '"';
-            if (count($group['paths']) > 1) {
-                $html .= ' srcset="' . self::htmlEscape(self::buildSrcset($group['paths'], $useWidth)) . '"';
-            } else {
-                $html .= ' src="' . self::htmlEscape($group['paths'][0]->path) . '"';
+            $srcset = self::buildSrcset($group['paths'], $useWidth);
+            if ($srcset === '') {
+                continue;
             }
-            $html .= '>';
+            $html .= '<source type="' . self::htmlEscape($group['type']) . '" srcset="'
+                . self::htmlEscape($srcset) . '">';
         }
-        $html .= "\n    " . $imgHtml . "\n</picture>";
-        return $html;
+        return $html . $imgHtml . '</picture>';
     }
 
-    /**
-     * URL ассета для целевого dpr (суффикс `@dpr` при dpr >= 2).
-     *
-     * @param mixed $segment
-     * @param mixed $format
-     * @param mixed $dpr
-     */
     public function GetAssetPath($source, $segment = null, $format = null, $dpr = null): string
     {
-        [$path, $sourceName, $sourceFormat] = self::splitSource((string)$source);
+        [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
         [$segStr] = self::normalizeSegment($segment);
-
-        $outFormat = $format !== null && $format !== "" ? (string)$format : $this->format;
-        if ($outFormat === "") {
-            $outFormat = $sourceFormat;
-        }
-
-        $dprVal = $this->resolveDpr($dpr);
+        $outFormat = ($format !== null && $format !== '') ? (string) $format : ($this->format !== '' ? $this->format : $sourceFormat);
+        $dprVal = self::parseDpr($dpr !== null ? $dpr : $this->dpr);
         if ($dprVal >= 2) {
-            $segStr = $segStr . "@" . $dprVal;
+            $segStr .= '@' . $dprVal;
         }
 
-        $name = $sourceFormat !== "" ? $sourceName . "-" . $sourceFormat : $sourceName;
-        $prefix = $path !== "" ? $this->baseURL . $path . "/" . $name . "/" : $this->baseURL . $name . "/";
-        return $prefix . $segStr . "." . $outFormat;
+        $name = $sourceFormat !== '' ? $sourceName . '-' . $sourceFormat : $sourceName;
+        $prefix = $path !== '' ? $this->baseURL . $path . '/' . $name . '/' : $this->baseURL . $name . '/';
+        return $prefix . $segStr . '.' . $outFormat;
     }
 
-    // ------------------------------------------------------------------ //
-    //  Админ-методы (HTTP через curl)                                    //
-    // ------------------------------------------------------------------ //
-
-    /**
-     * Общий админ-запрос; пустой token/adminURL → false без HTTP.
-     *
-     * target:
-     *   string          → режим A: {"source": ...}
-     *   AssetType       → режим B: {"assets": [paths[].path]}
-     *   AssetType[]     → режим B: {"assets": [paths[].path из ВСЕХ AssetType]}
-     *   string[]        → режим B: {"assets": [элементы как есть]}
-     *
-     * @param AssetType|AssetType[]|string[]|string $target
-     */
     private function adminRequest($target, bool $wait, string $endpoint, string $method): bool
     {
-        if ($this->token === "" || $this->adminURL === "") {
+        if ($this->token === '' || $this->adminURL === '') {
             return false;
         }
 
         if (is_string($target)) {
-            // режим A: source-строка как есть
-            $body = ["source" => $target];
+            $body = ['source' => $target];
         } else {
-            // режим B: собираем список assets
             $assets = [];
             if (is_array($target)) {
-                if (array_is_list($target) && count($target) > 0 && is_string($target[0])) {
-                    // string[] — пути как есть, без валидации и преобразований
+                if (array_is_list($target) && isset($target[0]) && is_string($target[0])) {
                     foreach ($target as $p) {
-                        $assets[] = (string)$p;
+                        $assets[] = (string) $p;
                     }
                 } elseif (array_is_list($target)) {
-                    // AssetType[] — path'ы всех AssetType подряд
                     foreach ($target as $at) {
                         if ($at instanceof AssetType) {
                             foreach ($at->paths as $p) {
@@ -722,16 +771,13 @@ final class Imager
                             }
                         } elseif (is_array($at) && isset($at['paths']) && is_array($at['paths'])) {
                             foreach ($at['paths'] as $p) {
-                                $assets[] = is_array($p) && isset($p['path']) ? (string)$p['path'] : "";
+                                $assets[] = is_array($p) && isset($p['path']) ? (string) $p['path'] : '';
                             }
                         }
                     }
-                } else {
-                    // ассоциативный массив — один AssetType
-                    if (isset($target['paths']) && is_array($target['paths'])) {
-                        foreach ($target['paths'] as $p) {
-                            $assets[] = is_array($p) && isset($p['path']) ? (string)$p['path'] : "";
-                        }
+                } elseif (isset($target['paths']) && is_array($target['paths'])) {
+                    foreach ($target['paths'] as $p) {
+                        $assets[] = is_array($p) && isset($p['path']) ? (string) $p['path'] : '';
                     }
                 }
             } elseif ($target instanceof AssetType) {
@@ -739,37 +785,37 @@ final class Imager
                     $assets[] = $p->path;
                 }
             }
-            $body = ["assets" => $assets];
+            $body = ['assets' => $assets];
         }
+
         $body['wait'] = $wait;
-
-        $url = $this->adminURL . $endpoint;
         $json = json_encode($body);
+        if ($json === false) {
+            return false;
+        }
 
-        $ch = curl_init($url);
+        $ch = curl_init($this->adminURL . $endpoint);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_POSTFIELDS => $json,
             CURLOPT_HTTPHEADER => [
-                "Authorization: Bearer " . $this->token,
-                "Content-Type: application/json",
+                'Authorization: Bearer ' . $this->token,
+                'Content-Type: application/json',
             ],
             CURLOPT_TIMEOUT => 10,
             CURLOPT_FOLLOWLOCATION => false,
         ]);
+
         $response = curl_exec($ch);
         if ($response === false) {
             curl_close($ch);
             return false;
         }
-        $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
 
-        if ($endpoint === "/admin/assets/delete") {
-            return $code === 200;
-        }
-        return $code === 200 || $code === 202;
+        return $endpoint === '/admin/assets/delete' ? $code === 200 : ($code === 200 || $code === 202);
     }
 
     /**

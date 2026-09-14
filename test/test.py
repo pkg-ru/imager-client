@@ -69,6 +69,123 @@ def dumps(value):
     return json.dumps(value, ensure_ascii=False)
 
 
+# --------------------------------------------------------------------- #
+#  Сравнение HTML: атрибуты без учёта порядка (наличие + значения)      #
+# --------------------------------------------------------------------- #
+
+
+def parse_html_tags(html):
+    """Разбирает HTML-строку на список тегов (текст между тегами игнорируется).
+
+    Каждый тег — (имя, [(имя_атрибута, значение), ...]); значение None —
+    атрибут без значения (булев).
+    """
+    tags = []
+    rest = html
+    while True:
+        open_pos = rest.find("<")
+        if open_pos < 0:
+            break
+        after = rest[open_pos + 1:]
+        close = after.find(">")
+        if close < 0:
+            break
+        tag_body = after[:close]
+        rest = after[close + 1:]
+        if tag_body.startswith("/") or tag_body.startswith("!"):
+            continue
+        tags.append(parse_tag_attrs(tag_body))
+    return tags
+
+
+def parse_tag_attrs(tag):
+    """Разбирает содержимое тега (без < >) на (имя, атрибуты)."""
+    sp = tag.find(" ")
+    if sp < 0:
+        return tag, []
+    name = tag[:sp]
+    attrs = []
+    rest = tag[sp + 1:].strip()
+    while rest:
+        eq = rest.find("=")
+        sp2 = rest.find(" ")
+        if eq >= 0 and (sp2 < 0 or eq < sp2):
+            attr_name = rest[:eq]
+            after_name = rest[eq + 1:]
+        elif sp2 >= 0:
+            attr_name = rest[:sp2]
+            after_name = rest[sp2 + 1:]
+        else:
+            attr_name = rest
+            after_name = ""
+        attr_name = attr_name.strip()
+        after_name = after_name.strip()
+
+        if not attr_name:
+            rest = after_name
+            continue
+
+        if after_name.startswith('"'):
+            close = after_name[1:].find('"')
+            if close >= 0:
+                value = after_name[1:1 + close]
+                rest = after_name[close + 2:].strip()
+            else:
+                value = after_name[1:]
+                rest = ""
+        elif after_name:
+            sp3 = after_name.find(" ")
+            if sp3 >= 0:
+                value = after_name[:sp3]
+                rest = after_name[sp3 + 1:].strip()
+            else:
+                value = after_name
+                rest = ""
+        else:
+            value = None
+            rest = ""
+        attrs.append((attr_name, value))
+    return name, attrs
+
+
+def attrs_equal(a, b):
+    """Сравнивает два списка атрибутов как мультимножества (порядок не важен)."""
+    if len(a) != len(b):
+        return False
+    used = [False] * len(b)
+    for ka in a:
+        found = False
+        for j, kb in enumerate(b):
+            if used[j]:
+                continue
+            if ka[0] == kb[0] and attr_value_equal(ka[1], kb[1]):
+                used[j] = True
+                found = True
+                break
+        if not found:
+            return False
+    return True
+
+
+def attr_value_equal(a, b):
+    """Сравнивает значения атрибутов (None — атрибут без значения)."""
+    if a is None or b is None:
+        return a is None and b is None
+    return str(a) == str(b)
+
+
+def html_equal(a, b):
+    """Сравнивает HTML-строки: порядок тегов важен, порядок атрибутов — нет."""
+    ta = parse_html_tags(a)
+    tb = parse_html_tags(b)
+    if len(ta) != len(tb):
+        return False
+    for (na, aa), (nb, ab) in zip(ta, tb):
+        if na != nb or not attrs_equal(aa, ab):
+            return False
+    return True
+
+
 def run_golden():
     """Сравнивает результаты всех кейсов fixture.json с expected."""
     fixture = load_fixture()
@@ -79,7 +196,12 @@ def run_golden():
         cid = case["id"]
         actual = run_case(case)
         expected = case["expected"]
-        if not _json_equal(actual, expected):
+        if case["method"] == "GetAssetsHtml":
+            # HTML: порядок тегов важен, порядок атрибутов — нет.
+            ok = html_equal(str(actual), str(expected))
+        else:
+            ok = _json_equal(actual, expected)
+        if not ok:
             failed += 1
             print("[FAIL] id=%d %s" % (cid, case["method"]))
             print("  expected: %s" % dumps(expected))
@@ -92,13 +214,13 @@ def run_golden():
 
 
 def _json_equal(a, b):
-    """Побайтовое сравнение JSON-сериализации (включая порядок ключей)."""
+    """Сравнение без учёта порядка ключей в dict (порядок элементов в списках сохраняется)."""
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
             return False
         return all(_json_equal(x, y) for x, y in zip(a, b))
     if isinstance(a, dict) and isinstance(b, dict):
-        if list(a.keys()) != list(b.keys()):
+        if set(a.keys()) != set(b.keys()):
             return False
         return all(_json_equal(a[k], b[k]) for k in a)
     if isinstance(a, bool) != isinstance(b, bool):

@@ -457,7 +457,6 @@
             "paths": [
                 {
                     "path": "https://imgs.example.com/images/photo-jpg/200x200.jpg",
-                    "dpr": 1,
                     "width": 200,
                     "height": 200
                 }
@@ -737,7 +736,8 @@
                 "200x200",
                 "x400"
             ],
-            "formats": "webp"
+            "formats": "webp",
+            "dprs": 1
         },
         "expected": [
             {
@@ -874,7 +874,6 @@
                 "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/200x200.webp",
-                        "dpr": 1,
                         "width": 200,
                         "height": 200
                     }
@@ -885,7 +884,6 @@
                 "paths": [
                     {
                         "path": "https://imgs.example.com/images/test-png/200x200.avif",
-                        "dpr": 1,
                         "width": 200,
                         "height": 200
                     }
@@ -954,7 +952,7 @@
                 "lazy": true
             }
         },
-        "expected": "<picture class=\"photo\" id=\"main\">\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Hello &amp; &lt;world&gt;\" loading=\"lazy\" width=\"200\" height=\"200\">\n</picture>"
+        "expected": "<picture class=\"photo\" id=\"main\"><source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\"><img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Hello &amp; &lt;world&gt;\" loading=\"lazy\" width=\"200\" height=\"200\"></picture>"
     },
     {
         "id": 38,
@@ -1087,7 +1085,7 @@
             ],
             "dprs": 3
         },
-        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x, /test-png/test-png/200x200@3.webp 3x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x, /test-png/test-png/200x200@3.png 3x\" width=\"200\" height=\"200\">\n</picture>"
+        "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x, /test-png/test-png/200x200@3.webp 3x\"><img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x, /test-png/test-png/200x200@3.png 3x\" width=\"200\" height=\"200\"></picture>"
     },
     {
         "id": 46,
@@ -1107,7 +1105,7 @@
                 "sizes": "(max-width: 600px) 100vw, 50vw"
             }
         },
-        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 200w, /test-png/test-png/200x200@2.webp 400w, /test-png/test-png/200x200@3.webp 600w\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 200w, /test-png/test-png/200x200@2.png 400w, /test-png/test-png/200x200@3.png 600w\" sizes=\"(max-width: 600px) 100vw, 50vw\" width=\"200\" height=\"200\">\n</picture>"
+        "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 200w, /test-png/test-png/200x200@2.webp 400w, /test-png/test-png/200x200@3.webp 600w\"><img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 200w, /test-png/test-png/200x200@2.png 400w, /test-png/test-png/200x200@3.png 600w\" sizes=\"(max-width: 600px) 100vw, 50vw\" width=\"200\" height=\"200\"></picture>"
     },
     {
         "id": 47,
@@ -1160,7 +1158,7 @@
             ],
             "dprs": 0
         },
-        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/x200.webp 1x, /test-png/test-png/x400.webp 2x, /test-png/test-png/x600.webp 3x\">\n    <img src=\"/test-png/test-png/x200.png\" srcset=\"/test-png/test-png/x200.png 1x, /test-png/test-png/x400.png 2x, /test-png/test-png/x600.png 3x\" height=\"200\">\n</picture>"
+        "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-png/x200.webp 1x, /test-png/test-png/x400.webp 2x, /test-png/test-png/x600.webp 3x\"><img src=\"/test-png/test-png/x200.png\" srcset=\"/test-png/test-png/x200.png 1x, /test-png/test-png/x400.png 2x, /test-png/test-png/x600.png 3x\" height=\"200\"></picture>"
     },
     {
         "id": 50,
@@ -1177,7 +1175,7 @@
             ],
             "dprs": 0
         },
-        "expected": "<picture>\n    <source type=\"image/webp\" src=\"/test-png/test-png/x.webp\">\n    <img src=\"/test-png/test-png/x.png\">\n</picture>"
+        "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-png/x.webp\"><img src=\"/test-png/test-png/x.png\"></picture>"
     },
     {
         "id": 51,
@@ -1200,7 +1198,7 @@
                 "fetchpriority": "high"
             }
         },
-        "expected": "<picture class=\"photo\">\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Фото\" decoding=\"async\" fetchpriority=\"high\" width=\"200\" height=\"200\">\n</picture>"
+        "expected": "<picture class=\"photo\"><source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\"><img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Фото\" decoding=\"async\" fetchpriority=\"high\" width=\"200\" height=\"200\"></picture>"
     },
     {
         "id": 52,
@@ -1228,7 +1226,7 @@
                 }
             }
         },
-        "expected": "<picture class=\"photo\">\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Фото\" class=\"img\" decoding=\"async\" fetchpriority=\"high\" height=\"444\" width=\"333\">\n</picture>"
+        "expected": "<picture class=\"photo\"><source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\"><img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Фото\" class=\"img\" decoding=\"async\" fetchpriority=\"high\" width=\"333\" height=\"444\"></picture>"
     },
     {
         "id": 53,
@@ -1251,6 +1249,109 @@
                 }
             }
         },
-        "expected": "<picture>\n    <source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\">\n    <img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Приоритет\" width=\"200\" height=\"200\">\n</picture>"
+        "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-png/200x200.webp 1x, /test-png/test-png/200x200@2.webp 2x\"><img src=\"/test-png/test-png/200x200.png\" srcset=\"/test-png/test-png/200x200.png 1x, /test-png/test-png/200x200@2.png 2x\" alt=\"Приоритет\" width=\"200\" height=\"200\"></picture>"
+    },
+    {
+        "id": 54,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "photo.jpg",
+            "segments": [
+                "100x",
+                "200x",
+                "300x",
+                "450x",
+                "x"
+            ],
+            "formats": [
+                "webp"
+            ],
+            "dprs": 0
+        },
+        "expected": "<img src=\"/test-png/photo-jpg/100x.webp\" srcset=\"/test-png/photo-jpg/100x.webp 1x, /test-png/photo-jpg/200x.webp 2x, /test-png/photo-jpg/300x.webp 3x, /test-png/photo-jpg/450x.webp 4.5x, /test-png/photo-jpg/x.webp 5.5x\" width=\"100\">"
+    },
+    {
+        "id": 55,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "photo.jpg",
+            "segments": [
+                "100x",
+                "200x",
+                "300x",
+                "450x",
+                "x"
+            ],
+            "formats": [
+                "webp"
+            ],
+            "dprs": 0,
+            "options": {
+                "sizes": "(min-width: 600px) 400px, 100vw"
+            }
+        },
+        "expected": "<img src=\"/test-png/photo-jpg/100x.webp\" srcset=\"/test-png/photo-jpg/100x.webp 100w, /test-png/photo-jpg/200x.webp 200w, /test-png/photo-jpg/300x.webp 300w, /test-png/photo-jpg/450x.webp 450w\" sizes=\"(min-width: 600px) 400px, 100vw\" width=\"100\">"
+    },
+    {
+        "id": 56,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "photo.jpg",
+            "segments": [
+                "x"
+            ],
+            "formats": [
+                "webp"
+            ],
+            "dprs": 0,
+            "options": {
+                "sizes": "100vw"
+            }
+        },
+        "expected": "<img src=\"/test-png/photo-jpg/x.webp\" sizes=\"100vw\">"
+    },
+    {
+        "id": 57,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "photo.jpg",
+            "segments": [
+                "x"
+            ],
+            "formats": [
+                "webp"
+            ],
+            "dprs": 2
+        },
+        "expected": "<img src=\"/test-png/photo-jpg/x.webp\" srcset=\"/test-png/photo-jpg/x.webp 1x, /test-png/photo-jpg/x@2.webp 2x\">"
+    },
+    {
+        "id": 58,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "test.png",
+            "segments": "x",
+            "formats": [
+                "webp",
+                "png"
+            ],
+            "dprs": 1
+        },
+        "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-png/x.webp\"><img src=\"/test-png/test-png/x.png\"></picture>"
     }
 ]

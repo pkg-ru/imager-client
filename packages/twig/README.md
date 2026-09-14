@@ -2,7 +2,7 @@
 
 Twig-расширение для микросервиса [Imager](https://gitverse.ru/pkg-ru/imager).
 
-> **Пакет:** [Packagist](https://packagist.org/packages/pkg-ru/imager-twig) · **Репозиторий:** [GitHub](https://github.com/pkg-ru/imager-twig)
+> **Пакет:** [Packagist](https://packagist.org/packages/pkg-ru/imager-twig) · **Репозиторий:** [GitHub](https://github.com/pkg-ru/imager-twig) · **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager)
 
 Тонкая обёртка над ядром [`pkg-ru/imager-client`](https://packagist.org/packages/pkg-ru/imager-client): вся логика
 (сегменты, dpr, форматы, srcset) — в ядре, расширение нормализует алиасы

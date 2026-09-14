@@ -2,7 +2,7 @@
 
 React-компоненты для микросервиса [Imager](https://gitverse.ru/pkg-ru/imager).
 
-> **Пакет:** [npm](https://www.npmjs.com/package/@pkg-ru/imager-react) · **Репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) / [GitHub](https://github.com/pkg-ru/imager-client)
+> **Пакет:** [npm](https://www.npmjs.com/package/@pkg-ru/imager-react) · **Репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) / [GitHub](https://github.com/pkg-ru/imager-client) · **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager)
 
 Тонкие обёртки над ядром [`imager-client`](https://www.npmjs.com/package/imager-client): вся логика
 (сегменты, dpr, форматы, srcset, группировка `<picture>`) — в ядре, компоненты нормализуют

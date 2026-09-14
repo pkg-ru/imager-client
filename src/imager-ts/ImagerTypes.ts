@@ -1,20 +1,11 @@
-/** Типы и структуры клиентской библиотеки imager (TypeScript, клиентская часть).
+/*! @license
+ * imager-client — клиент микросервиса Imager
+ * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Автор: Vladislav Altukhov (https://altuh.ru/about)
+ * Демо: https://altuh.ru/demo/imager
+ */
+/** Типы и структуры клиентской библиотеки imager (TypeScript, клиентская часть). */
 
-Содержит:
-- интерфейсы AssetPath / AssetType (результаты клиентских методов);
-- интерфейсы ImagerOptions / ImagerServerOptions (настройки конструкторов);
-- тип Segment и таблицу MIME по формату.
-
-Важно: в клиентской части (ImagerOptions) нет служебных полей
-аутентификации — они существуют только в серверной части
-(ImagerServerOptions, src/imager-ts-server).
-*/
-
-/** Один вариант ассета внутри `paths`.
-
-Все поля кроме `path` опциональны: включаются в сериализацию только
-если заданы, в порядке path, dpr, width, height.
-*/
 export interface AssetPath {
     path: string;
     dpr?: number;
@@ -54,8 +45,9 @@ export type Segment = string | { width?: number; height?: number } | [number, nu
 
 /** MIME для итогового формата; неизвестный/видео → пустая строка. */
 export function mimeFor(format: string): string {
-    if (format == 'jpg') {
-        format = 'jpeg';
+    if (format === "jpg") {
+        format = "jpeg";
     }
+
     return "image/" + format;
 }

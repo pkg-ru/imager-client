@@ -17,6 +17,7 @@ import { Imager } from "../src/imager-ts/Imager";
 import { ImagerServer } from "../src/imager-ts-server/ImagerServer";
 import { AssetType } from "../src/imager-ts/ImagerTypes";
 import { normalizeProps } from "../src/imager-ts/component";
+import { htmlEqual } from "./html-parse";
 
 // --------------------------------------------------------------------- //
 //  Загрузка фикстур                                                     //
@@ -94,7 +95,12 @@ function runCase(case_: FixtureCase): any {
                 args["options"] as Record<string, unknown>,
             );
         case "NormalizeProps":
-            return normalizeProps(args["props"] as never);
+            return normalizeProps(
+                args["props"] as never,
+                args["include"]
+                    ? { include: args["include"] as readonly string[] }
+                    : undefined,
+            );
         default:
             throw new Error("Unknown method: " + case_.method);
     }
@@ -123,15 +129,11 @@ function jsonEqual(a: unknown, b: unknown): boolean {
             return false;
         }
         for (let i = 0; i < ak.length; i++) {
-            if (ak[i] !== bk[i]) {
+            const key = ak[i];
+            if (!Object.prototype.hasOwnProperty.call(b, key)) {
                 return false;
             }
-            if (
-                !jsonEqual(
-                    (a as Record<string, unknown>)[ak[i]],
-                    (b as Record<string, unknown>)[bk[i]],
-                )
-            ) {
+            if (!jsonEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
                 return false;
             }
         }
@@ -144,6 +146,10 @@ function dumps(value: unknown): string {
     return JSON.stringify(value);
 }
 
+// --------------------------------------------------------------------- //
+//  Golden-кейсы                                                         //
+// --------------------------------------------------------------------- //
+
 function runGolden(): number {
     const fixture = loadFixture();
     let failed = 0;
@@ -152,9 +158,14 @@ function runGolden(): number {
         total += 1;
         const actual = runCase(case_);
         const expected = case_.expected;
-        const actualJson = JSON.stringify(actual);
-        const expectedJson = JSON.stringify(expected);
-        if (!jsonEqual(actual, expected) || actualJson !== expectedJson) {
+        let ok: boolean;
+        if (case_.method === "GetAssetsHtml") {
+            // HTML: порядок тегов важен, порядок атрибутов — нет.
+            ok = htmlEqual(String(actual), String(expected));
+        } else {
+            ok = jsonEqual(actual, expected);
+        }
+        if (!ok) {
             failed += 1;
             console.log(`[FAIL] id=${case_.id} ${case_.method}`);
             console.log(`  expected: ${dumps(expected)}`);

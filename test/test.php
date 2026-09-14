@@ -146,6 +146,152 @@ function dumps($value): string
     return encode($value);
 }
 
+// ------------------------------------------------------------------ //
+//  Сравнение HTML: атрибуты без учёта порядка (наличие + значения)   //
+// ------------------------------------------------------------------ //
+
+/**
+ * Разбирает HTML-строку на список тегов. Каждый тег — [имя, атрибуты],
+ * где атрибуты — список [имя, значение]; значение null — атрибут без
+ * значения (булев). Текст между тегами игнорируется.
+ */
+function parseHtmlTags(string $html): array
+{
+    $tags = [];
+    $rest = $html;
+    while (true) {
+        $pos = strpos($rest, '<');
+        if ($pos === false) {
+            break;
+        }
+        $after = substr($rest, $pos + 1);
+        $close = strpos($after, '>');
+        if ($close === false) {
+            break;
+        }
+        $tagBody = substr($after, 0, $close);
+        $rest = substr($after, $close + 1);
+        if (substr($tagBody, 0, 1) === '/' || substr($tagBody, 0, 1) === '!') {
+            continue;
+        }
+        $tags[] = parseTagAttrs($tagBody);
+    }
+    return $tags;
+}
+
+/** Разбирает содержимое тега (без < >) на [имя, атрибуты]. */
+function parseTagAttrs(string $tag): array
+{
+    $sp = strpos($tag, ' ');
+    if ($sp === false) {
+        return [$tag, []];
+    }
+    $name = substr($tag, 0, $sp);
+    $attrs = [];
+    $rest = trim(substr($tag, $sp + 1));
+    while ($rest !== '') {
+        $eq = strpos($rest, '=');
+        $sp2 = strpos($rest, ' ');
+        $attrName = '';
+        $afterName = '';
+        if ($eq !== false && ($sp2 === false || $eq < $sp2)) {
+            $attrName = substr($rest, 0, $eq);
+            $afterName = substr($rest, $eq + 1);
+        } elseif ($sp2 !== false) {
+            $attrName = substr($rest, 0, $sp2);
+            $afterName = substr($rest, $sp2 + 1);
+        } else {
+            $attrName = $rest;
+            $afterName = '';
+        }
+        $attrName = trim($attrName);
+        $afterName = trim($afterName);
+
+        if ($attrName === '') {
+            $rest = $afterName;
+            continue;
+        }
+
+        $value = null;
+        if (substr($afterName, 0, 1) === '"') {
+            $close = strpos(substr($afterName, 1), '"');
+            if ($close !== false) {
+                $value = substr($afterName, 1, $close);
+                $rest = trim(substr($afterName, $close + 2));
+            } else {
+                $value = substr($afterName, 1);
+                $rest = '';
+            }
+        } elseif ($afterName !== '') {
+            $sp3 = strpos($afterName, ' ');
+            if ($sp3 !== false) {
+                $value = substr($afterName, 0, $sp3);
+                $rest = trim(substr($afterName, $sp3 + 1));
+            } else {
+                $value = $afterName;
+                $rest = '';
+            }
+        } else {
+            $value = null;
+            $rest = '';
+        }
+        $attrs[] = [$attrName, $value];
+    }
+    return [$name, $attrs];
+}
+
+/** Сравнивает два списка атрибутов как мультимножества (порядок не важен). */
+function attrsEqual(array $a, array $b): bool
+{
+    if (count($a) !== count($b)) {
+        return false;
+    }
+    $used = [];
+    foreach ($a as $ka) {
+        $found = false;
+        foreach ($b as $j => $kb) {
+            if (isset($used[$j])) {
+                continue;
+            }
+            if ($ka[0] === $kb[0] && attrValueEqual($ka[1], $kb[1])) {
+                $used[$j] = true;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/** Сравнивает значения атрибутов (null — атрибут без значения). */
+function attrValueEqual($a, $b): bool
+{
+    if ($a === null || $b === null) {
+        return $a === null && $b === null;
+    }
+    return (string)$a === (string)$b;
+}
+
+/** Сравнивает HTML-строки: порядок тегов важен, порядок атрибутов — нет. */
+function htmlEqual(string $a, string $b): bool
+{
+    $ta = parseHtmlTags($a);
+    $tb = parseHtmlTags($b);
+    if (count($ta) !== count($tb)) {
+        return false;
+    }
+    foreach ($ta as $i => $tagA) {
+        $tagB = $tb[$i];
+        if ($tagA[0] !== $tagB[0] || !attrsEqual($tagA[1], $tagB[1])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function runGolden(): int
 {
     $fixture = loadFixture();
@@ -162,7 +308,15 @@ function runGolden(): int
         $actual = runCase($case);
         $expected = $case['expected'];
 
-        if (!jsonEqual($actual, $expected)) {
+        $ok = false;
+        if ($case['method'] === 'GetAssetsHtml') {
+            // HTML: порядок тегов важен, порядок атрибутов — нет.
+            $ok = htmlEqual((string)$actual, (string)$expected);
+        } else {
+            $ok = jsonEqual($actual, $expected);
+        }
+
+        if (!$ok) {
             $failed++;
             echo '[FAIL] id=' . $cid . ' ' . $case['method'] . PHP_EOL;
             echo '  expected: ' . dumps($expected) . PHP_EOL;
@@ -186,11 +340,25 @@ function runGolden(): int
 function jsonEqual($a, $b): bool
 {
     if (is_array($a) && is_array($b)) {
-        if (array_keys($a) !== array_keys($b)) {
+        if (array_is_list($a) && array_is_list($b)) {
+            if (count($a) !== count($b)) {
+                return false;
+            }
+            foreach ($a as $i => $v) {
+                if (!jsonEqual($v, $b[$i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (array_is_list($a) || array_is_list($b)) {
+            return false;
+        }
+        if (count($a) !== count($b)) {
             return false;
         }
         foreach ($a as $k => $v) {
-            if (!jsonEqual($v, $b[$k])) {
+            if (!array_key_exists($k, $b) || !jsonEqual($v, $b[$k])) {
                 return false;
             }
         }

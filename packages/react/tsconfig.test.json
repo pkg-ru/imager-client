@@ -12,6 +12,8 @@
         "test/test.tsx",
         "src/**/*.ts",
         "src/**/*.tsx",
-        "../../../src/imager-ts/**/*.ts"
+        "../../../src/imager-ts/**/*.ts",
+        "../../../test/html-parse.ts",
+        "../../../test/fixture-html.ts"
     ]
 }

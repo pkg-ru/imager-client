@@ -67,26 +67,21 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      # Пакеты react/vue участвуют в golden-тестах (HTML-кейсы fixture.json)
+      # и имеют собственные зависимости — устанавливаем их до прогона.
+      - name: Install package dependencies (react/vue)
+        run: |
+          cd packages/react && npm ci
+          cd ../vue && npm ci
+
       - name: Build TypeScript
         run: npm run build
 
       # Единый golden-тест для всех языков: оркестратор go run test/test.go
-      # запускает TS (npm test), PHP (php test/test.php), Python (python test/test.py)
-      # и Go-часть (RunGolden/RunAdmin) последовательно в одном шаге。
+      # запускает TS (npm test), PHP (php test/test.php), Python (python test/test.py),
+      # Go-часть (RunGolden/RunAdmin) и пакеты react/vue (npm test) последовательно。
       - name: Test all languages (go run test/test.go)
         run: go run test/test.go
-
-      - name: Test React package
-        run: |
-          cd packages/react
-          npm ci
-          npm test
-
-      - name: Test Vue package
-        run: |
-          cd packages/vue
-          npm ci
-          npm test
 
       - name: Install PHP dependencies (twig for extension test)
         run: composer install --no-interaction --no-progress --prefer-dist
