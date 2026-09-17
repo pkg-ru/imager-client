@@ -1,6 +1,6 @@
 {
     "name": "@pkg-ru/imager-react",
-    "version": "2.0.5",
+    "version": "2.0.6",
     "description": "React-компоненты для микросервиса Imager: ImagerPlugin, ImagerProvider, ImagerAssets, ImagerAsset",
     "license": "GPL-3.0",
     "readme": "README.md",
@@ -33,7 +33,7 @@
         "test": "tsc -p tsconfig.test.json && node dist-test/imager-client/packages/react/test/test.js"
     },
     "peerDependencies": {
-        "imager-client": ">=2.0.5",
+        "imager-client": ">=2.0.6",
         "react": ">=17.0.0"
     },
     "peerDependenciesMeta": {
