@@ -32,8 +32,8 @@ i := imager.New(options ...imager.Options) *Imager
 |---|---|---|---|
 | `Token` | `string` | `""` | токен админ-методов (только `AdminGenerate`/`AdminDelete`) |
 | `Dpr` | `int` | `0` | итоговое dpr по умолчанию; 0-1 — не используется, 2-3 — используется |
-| `Format` | `string` | `""` | формат генерации по умолчанию (пусто — формат исходника) |
-| `Formats` | `[]string` | `[]` | список форматов по умолчанию; если пуст — используется `Format` |
+| `Format` | `string` | `""` | формат генерации по умолчанию (`""`/`"auto"` — формат исходника; если исходник не картинка — `jpg`) |
+| `Formats` | `[]string` | `[]` | список форматов по умолчанию; если пуст — используется `Format`; дубли удаляются (`jpeg` → `jpg`) |
 | `BaseURL` | `string` | `"/"` | база URL ассетов; нормализуется (всегда с завершающим `/`) |
 | `AdminURL` | `string` | `""` | базовый URL админ-API (без завершающего `/`) |
 
@@ -64,7 +64,7 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 |---|---|---|
 | `source` | `string` | путь к исходнику (`/test.gif`, `test.gif`, `thumbs/photo.jpg`) |
 | `segment` | `any` | `string` \| `Size` \| `[2]int` \| `nil`; не задан → `"x"` |
-| `format` | `string` | итоговый формат; пусто → настройки `Format` → формат исходника |
+| `format` | `string` | итоговый формат; `"auto"`/`""` → формат исходника (если исходник не картинка — `jpg`); пусто → настройки `Format` → формат исходника |
 | `dpr` | `any` | `int` \| `string`; не задан → настройки `Dpr`; < 1 → не используется |
 
 ### GetAssets
@@ -74,6 +74,16 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 ```
 
 Возвращает **список** `AssetType` — по одному на каждый формат (все ассеты с одинаковым типом объединяются в один `AssetType`). Внутри `Paths` порядок **сегмент-мажорный**: для каждого сегмента все dpr-шаги подряд. `Dpr` каждого пути пересчитывается из фактических размеров: база — ширина (или высота) первого участника с известным размером, `dpr = фактическая ширина / базовая ширина`. `segments` не задан → `["x"]`. `formats` не задан → настройки `Formats` → `[Format]` → `[формат исходника]`.
+
+Список форматов дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются (первое вхождение сохраняет позицию). Элемент `"auto"` (или `""`) означает формат исходника; если исходник не картинка (видео, нет расширения) — подставляется `jpg`. Поддерживаемые форматы картинок: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+
+```go
+i.GetAssets("/test.jpg", "100x100", []string{"webp", "avif", "jpg", "webp", "auto"}, nil)  // → webp, avif, jpg
+i.GetAssets("/test.jpg", "100x100", []string{"webp", "auto"}, nil)                         // → webp, jpg
+i.GetAssets("/test.jpg", "100x100", []string{"jpg", "auto"}, nil)                          // → jpg
+i.GetAssets("/test.mov", "100x100", []string{"jpg", "auto"}, nil)                          // → jpg
+i.GetAssets("/test.jpg", "100x100", []string{"webp", "jpg", "auto"}, nil)                  // → webp, jpg
+```
 
 ### GetAssetsHtml
 

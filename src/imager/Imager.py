@@ -10,7 +10,13 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional, Union
 
-from .ImagerTypes import AssetType, ImagerOptions
+from .ImagerTypes import (
+    AssetType,
+    ImagerOptions,
+    dedupe_formats,
+    normalize_format,
+    resolve_format,
+)
 
 __all__ = ["Imager"]
 
@@ -258,13 +264,17 @@ class Imager:
             else:
                 fmt_list = [str(f) for f in formats] if formats else []
             if fmt_list:
-                return fmt_list
+                return dedupe_formats(
+                    [resolve_format(f, source_format) for f in fmt_list]
+                )
 
         if default_formats:
-            return default_formats
+            return dedupe_formats(
+                [resolve_format(f, source_format) for f in default_formats]
+            )
         if default_format:
-            return [default_format]
-        return [source_format] if source_format else [""]
+            return [resolve_format(default_format, source_format)]
+        return [resolve_format("", source_format)]
 
 
     @staticmethod
@@ -418,7 +428,7 @@ class Imager:
                 paths.append(item)
 
             asset: AssetType = {"type": mime, "paths": paths}
-            if eff == source_format:
+            if normalize_format(eff) == normalize_format(source_format):
                 asset["source_format"] = True
             if eff in ("jpg", "jpeg", "gif", "png"):
                 asset["all_support"] = True
@@ -446,9 +456,10 @@ class Imager:
             self._src_cache = (source, path, source_name, source_format, prefix)
 
         seg_str, is_size, width, height = self._normalize_segment(segment)
-        out_format = format if format else self._format
-        if not out_format:
-            out_format = source_format
+        out_format = resolve_format(
+            format if format else (self._format if self._format else ""),
+            source_format,
+        )
 
         dpr_val = self._parse_dpr(self._dpr if dpr is None else dpr)
 
@@ -474,7 +485,7 @@ class Imager:
             mime = "image/" + out_format
 
         result: AssetType = {"type": mime, "paths": [item]}
-        if out_format == source_format:
+        if normalize_format(out_format) == normalize_format(source_format):
             result["source_format"] = True
         if out_format in ("jpg", "jpeg", "gif", "png"):
             result["all_support"] = True
@@ -784,7 +795,7 @@ class Imager:
 
             group["srcset"] = ", ".join(srcset_parts)
             group["path_count"] = len(seg_data) * steps
-            if eff == source_format:
+            if normalize_format(eff) == normalize_format(source_format):
                 group["source_format"] = True
             if eff in ("jpg", "jpeg", "gif", "png"):
                 group["all_support"] = True
@@ -900,9 +911,10 @@ class Imager:
         else:
             seg_str = self._segment_to_string(segment)
 
-        out_format = format if format else self._format
-        if not out_format:
-            out_format = source_format
+        out_format = resolve_format(
+            format if format else (self._format if self._format else ""),
+            source_format,
+        )
 
         dpr_val = self._parse_dpr(self._dpr if dpr is None else dpr)
         if dpr_val >= 2:

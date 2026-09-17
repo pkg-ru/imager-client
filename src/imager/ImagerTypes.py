@@ -9,7 +9,45 @@ __all__ = [
     "ImagerOptions",
     "ImagerServerOptions",
     "Segment",
+    "IMAGE_FORMATS",
+    "normalize_format",
+    "resolve_format",
+    "dedupe_formats",
 ]
+
+# Форматы картинок, поддерживаемые сервисом. Всё, что не входит в этот
+# список (видео и прочее), при format="auto"/"" трактуется как не-картинка.
+IMAGE_FORMATS = frozenset(
+    ("jpg", "jpeg", "png", "webp", "avif", "heif", "heic", "apng", "jxl", "gif")
+)
+
+
+def normalize_format(format: str) -> str:
+    """Нормализация формата: lower-case, jpeg → jpg."""
+    if format == "jpeg":
+        return "jpg"
+    if format.isupper():
+        return format.lower()
+    return format
+
+
+def resolve_format(format: str, source_format: str) -> str:
+    """Резолв одного формата: "auto"/"" → исходный формат, если он картинка, иначе jpg."""
+    if format == "auto" or format == "":
+        return source_format if source_format in IMAGE_FORMATS else "jpg"
+    return normalize_format(format)
+
+
+def dedupe_formats(formats: List[str]) -> List[str]:
+    """Дедупликация списка форматов (jpeg → jpg, первое вхождение сохраняет позицию)."""
+    seen = set()
+    result = []
+    for fmt in formats:
+        fmt = normalize_format(fmt)
+        if fmt not in seen:
+            seen.add(fmt)
+            result.append(fmt)
+    return result
 
 
 class AssetPath(TypedDict, total=False):

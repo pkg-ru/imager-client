@@ -166,7 +166,22 @@ url := i.GetAssetPath("/test.gif", "200x200", "webp")
 ```text
 "webp"                    # один формат
 ["webp", "gif"]           # список (для GetAssets)
+"auto" | ""               # формат исходника; если исходник не картинка — "jpg"
 — не задан                # → настройки imager (format / formats) → формат исходника
+```
+
+Список дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются
+(первое вхождение сохраняет позицию). Поддерживаемые форматы картинок:
+`jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif` — всё остальное
+(видео, отсутствие расширения) считается не-картинкой, поэтому
+`auto`/`""` резолвится в `jpg`.
+
+```text
+GetAssets("/test.jpg", "100x100", ["webp", "avif", "jpg", "webp", "auto"])  # → webp, avif, jpg
+GetAssets("/test.jpg", "100x100", ["webp", "auto"])                         # → webp, jpg
+GetAssets("/test.jpg", "100x100", ["jpg", "auto"])                          # → jpg
+GetAssets("/test.mov", "100x100", ["jpg", "auto"])                          # → jpg
+GetAssets("/test.jpg", "100x100", ["webp", "jpg", "auto"])                  # → webp, jpg
 ```
 
 ### dpr — число или строка

@@ -19,6 +19,9 @@ import {
     ImagerOptions,
     Segment,
     mimeFor,
+    resolveFormat,
+    dedupeFormats,
+    normalizeFormat,
 } from "./ImagerTypes";
 
 import {
@@ -548,9 +551,7 @@ export class Imager {
                 ? format
                 : this._format;
 
-        if (outFormat === "") {
-            outFormat = sourceFormat;
-        }
+        outFormat = resolveFormat(outFormat, sourceFormat);
 
         const dprValue =
             this._resolveDpr(dpr);
@@ -603,7 +604,7 @@ export class Imager {
             paths: [path],
         };
 
-        if (outFormat === sourceFormat) {
+        if (normalizeFormat(outFormat) === normalizeFormat(sourceFormat)) {
             asset.source_format = true;
         }
 
@@ -642,10 +643,7 @@ export class Imager {
             } else if (this._format !== "") {
                 fmtList = [this._format];
             } else {
-                fmtList =
-                    sourceFormat !== ""
-                        ? [sourceFormat]
-                        : [""];
+                fmtList = [""];
             }
         } else if (
             typeof formats === "string"
@@ -677,12 +675,13 @@ export class Imager {
             } else if (this._format !== "") {
                 fmtList = [this._format];
             } else {
-                fmtList =
-                    sourceFormat !== ""
-                        ? [sourceFormat]
-                        : [""];
+                fmtList = [""];
             }
         }
+
+        fmtList = dedupeFormats(
+            fmtList.map((f) => resolveFormat(f, sourceFormat)),
+        );
 
         const dprValue = this._resolveDpr(dprs);
 
@@ -762,17 +761,13 @@ export class Imager {
         const allSupportFlags = new Array<boolean>(formatCount);
 
         for (let i = 0; i < formatCount; i++) {
-            const sourceValue = fmtList[i];
-
-            const effective =
-                sourceValue !== ""
-                    ? sourceValue
-                    : sourceFormat;
+            const effective = fmtList[i];
 
             effList[i] = effective;
             mimeList[i] = mimeFor(effective);
 
-            sourceFormatFlags[i] = effective === sourceFormat;
+            sourceFormatFlags[i] =
+                normalizeFormat(effective) === normalizeFormat(sourceFormat);
 
             allSupportFlags[i] =
                 effective === "jpg" ||
@@ -941,9 +936,7 @@ export class Imager {
                 ? format
                 : this._format;
 
-        if (outFormat === "") {
-            outFormat = sourceFormat;
-        }
+        outFormat = resolveFormat(outFormat, sourceFormat);
 
         const dprValue = this._resolveDpr(dpr);
 

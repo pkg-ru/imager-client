@@ -32,8 +32,8 @@ i := imager.New(options ...imager.Options) *Imager
 |---|---|---|---|
 | `Token` | `string` | `""` | admin method token (only `AdminGenerate`/`AdminDelete`) |
 | `Dpr` | `int` | `0` | default dpr; 0-1 = not used, 2-3 = used |
-| `Format` | `string` | `""` | default generation format (empty — source format) |
-| `Formats` | `[]string` | `[]` | default format list; if empty — `Format` is used |
+| `Format` | `string` | `""` | default generation format (`""`/`"auto"` — source format; if the source is not an image — `jpg`) |
+| `Formats` | `[]string` | `[]` | default format list; if empty — `Format` is used; duplicates are removed (`jpeg` → `jpg`) |
 | `BaseURL` | `string` | `"/"` | asset URL base; normalized (always trailing `/`) |
 | `AdminURL` | `string` | `""` | admin API base URL (no trailing `/`) |
 
@@ -64,7 +64,7 @@ Returns a **single** `AssetType`. `Paths` contains all dpr variants from 1 to th
 |---|---|---|
 | `source` | `string` | path to the source (`/test.gif`, `test.gif`, `thumbs/photo.jpg`) |
 | `segment` | `any` | `string` \| `Size` \| `[2]int` \| `nil`; not set → `"x"` |
-| `format` | `string` | output format; empty → `Format` option → source format |
+| `format` | `string` | output format; `"auto"`/`""` → source format (if the source is not an image — `jpg`); empty → `Format` option → source format |
 | `dpr` | `any` | `int` \| `string`; not set → `Dpr` option; < 1 → not used |
 
 ### GetAssets
@@ -74,6 +74,16 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 ```
 
 Returns a **list** of `AssetType` — one per format (all assets with the same type are merged into a single `AssetType`). Inside `Paths` the order is **segment-major**: for each segment all dpr steps in a row. The `Dpr` of each path is recalculated from actual sizes: the base is the width (or height) of the first participant with a known size, `dpr = actual width / base width`. `segments` not set → `["x"]`. `formats` not set → `Formats` option → `[Format]` → `[source format]`.
+
+The format list is deduplicated: `jpeg` is normalized to `jpg`, duplicates are removed (the first occurrence keeps its position). An `"auto"` (or `""`) element means the source file format; if the source is not an image (video, no extension) — `jpg` is used. Supported image formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+
+```go
+i.GetAssets("/test.jpg", "100x100", []string{"webp", "avif", "jpg", "webp", "auto"}, nil)  // → webp, avif, jpg
+i.GetAssets("/test.jpg", "100x100", []string{"webp", "auto"}, nil)                         // → webp, jpg
+i.GetAssets("/test.jpg", "100x100", []string{"jpg", "auto"}, nil)                          // → jpg
+i.GetAssets("/test.mov", "100x100", []string{"jpg", "auto"}, nil)                          // → jpg
+i.GetAssets("/test.jpg", "100x100", []string{"webp", "jpg", "auto"}, nil)                  // → webp, jpg
+```
 
 ### GetAssetsHtml
 

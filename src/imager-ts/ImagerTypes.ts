@@ -51,3 +51,50 @@ export function mimeFor(format: string): string {
 
     return "image/" + format;
 }
+
+/** Форматы картинок, поддерживаемые сервисом. Всё, что не входит в этот
+ * список (видео и прочее), при format="auto"/"" трактуется как не-картинка. */
+export const IMAGE_FORMATS: ReadonlySet<string> = new Set([
+    "jpg",
+    "jpeg",
+    "png",
+    "webp",
+    "avif",
+    "heif",
+    "heic",
+    "apng",
+    "jxl",
+    "gif",
+]);
+
+/** Нормализация формата: lower-case, jpeg → jpg. */
+export function normalizeFormat(format: string): string {
+    if (format === "jpeg") {
+        return "jpg";
+    }
+    return format === format.toUpperCase() && format !== format.toLowerCase()
+        ? format.toLowerCase()
+        : format;
+}
+
+/** Резолв одного формата: "auto"/"" → исходный формат, если он картинка, иначе jpg. */
+export function resolveFormat(format: string, sourceFormat: string): string {
+    if (format === "auto" || format === "") {
+        return IMAGE_FORMATS.has(sourceFormat) ? sourceFormat : "jpg";
+    }
+    return normalizeFormat(format);
+}
+
+/** Дедупликация списка форматов (jpeg → jpg, первое вхождение сохраняет позицию). */
+export function dedupeFormats(formats: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (let i = 0; i < formats.length; i++) {
+        const fmt = normalizeFormat(formats[i]);
+        if (!seen.has(fmt)) {
+            seen.add(fmt);
+            result.push(fmt);
+        }
+    }
+    return result;
+}

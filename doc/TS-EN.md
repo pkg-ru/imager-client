@@ -53,8 +53,8 @@ const imager = new Imager(options?: ImagerOptions | null);
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `dpr` | `number` | `0` | default dpr; 0-1 = not used, 2-3 = used |
-| `format` | `string` | `""` | default generation format (empty — source format) |
-| `formats` | `string[]` | `[]` | default format list; if empty — `format` is used |
+| `format` | `string` | `""` | default generation format (`""`/`"auto"` — source format; if the source is not an image — `jpg`) |
+| `formats` | `string[]` | `[]` | default format list; if empty — `format` is used; duplicates are removed (`jpeg` → `jpg`) |
 | `baseURL` | `string` | `"/"` | asset URL base; normalized (always trailing `/`) |
 
 ### Server part
@@ -108,12 +108,22 @@ Returns a **single** `AssetType`. `paths` contains all dpr variants from 1 to th
 |---|---|---|
 | `source` | `string` | path to the source (`/test.gif`, `test.gif`, `thumbs/photo.jpg`) |
 | `segment` | `Segment` \| `null` | segment; not set → `"x"` |
-| `format` | `string` \| `null` | output format; not set → `format` option → source format |
+| `format` | `string` \| `null` | output format; `"auto"`/`""` → source format (if the source is not an image — `jpg`); not set → `format` option → source format |
 | `dpr` | `number` \| `string` \| `null` | final dpr; not set → `dpr` option; < 1 → not used |
 
 #### GetAssets
 
 Returns a **list** of `AssetType` — one per format (all assets with the same type are merged into a single `AssetType`). Inside `paths` the order is **segment-major**: for each segment all dpr steps in a row. The `dpr` of each path is recalculated from actual sizes: the base is the width (or height) of the first participant with a known size, `dpr = actual width / base width`. `segments` not set → `["x"]`. `formats` not set → `formats` option → `[format]` → `[source format]`.
+
+The format list is deduplicated: `jpeg` is normalized to `jpg`, duplicates are removed (the first occurrence keeps its position). An `"auto"` (or `""`) element means the source file format; if the source is not an image (video, no extension) — `jpg` is used. Supported image formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+
+```ts
+imager.GetAssets("/test.jpg", "100x100", ["webp", "avif", "jpg", "webp", "auto"]);  // → webp, avif, jpg
+imager.GetAssets("/test.jpg", "100x100", ["webp", "auto"]);                         // → webp, jpg
+imager.GetAssets("/test.jpg", "100x100", ["jpg", "auto"]);                          // → jpg
+imager.GetAssets("/test.mov", "100x100", ["jpg", "auto"]);                          // → jpg
+imager.GetAssets("/test.jpg", "100x100", ["webp", "jpg", "auto"]);                  // → webp, jpg
+```
 
 #### GetAssetsHtml
 

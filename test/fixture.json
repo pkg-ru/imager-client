@@ -969,7 +969,7 @@
             "type": "image/jpeg",
             "paths": [
                 {
-                    "path": "https://imgs.example.com/images/photo-jpeg/thumb.jpeg"
+                    "path": "https://imgs.example.com/images/photo-jpeg/thumb.jpg"
                 }
             ],
             "source_format": true,
@@ -1353,5 +1353,275 @@
             "dprs": 1
         },
         "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-png/x.webp\"><img src=\"/test-png/test-png/x.png\"></picture>"
+    },
+    {
+        "id": 59,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": "100x100",
+            "formats": [
+                "webp",
+                "avif",
+                "jpg",
+                "webp",
+                "auto"
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.webp",
+                        "width": 100,
+                        "height": 100
+                    }
+                ]
+            },
+            {
+                "type": "image/avif",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.avif",
+                        "width": 100,
+                        "height": 100
+                    }
+                ]
+            },
+            {
+                "type": "image/jpeg",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.jpg",
+                        "width": 100,
+                        "height": 100
+                    }
+                ],
+                "source_format": true,
+                "all_support": true
+            }
+        ]
+    },
+    {
+        "id": 60,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": "100x100",
+            "formats": [
+                "webp",
+                "auto"
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.webp",
+                        "width": 100,
+                        "height": 100
+                    }
+                ]
+            },
+            {
+                "type": "image/jpeg",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.jpg",
+                        "width": 100,
+                        "height": 100
+                    }
+                ],
+                "source_format": true,
+                "all_support": true
+            }
+        ]
+    },
+    {
+        "id": 61,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": "100x100",
+            "formats": [
+                "jpg",
+                "auto"
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/jpeg",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.jpg",
+                        "width": 100,
+                        "height": 100
+                    }
+                ],
+                "source_format": true,
+                "all_support": true
+            }
+        ]
+    },
+    {
+        "id": 62,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.mov",
+            "segments": "100x100",
+            "formats": [
+                "jpg",
+                "auto"
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/jpeg",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-mov/100x100.jpg",
+                        "width": 100,
+                        "height": 100
+                    }
+                ],
+                "all_support": true
+            }
+        ]
+    },
+    {
+        "id": 63,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": "100x100",
+            "formats": [
+                "webp",
+                "jpg",
+                "auto"
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.webp",
+                        "width": 100,
+                        "height": 100
+                    }
+                ]
+            },
+            {
+                "type": "image/jpeg",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.jpg",
+                        "width": 100,
+                        "height": 100
+                    }
+                ],
+                "source_format": true,
+                "all_support": true
+            }
+        ]
+    },
+    {
+        "id": 64,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAsset",
+        "args": {
+            "source": "/test.mov",
+            "segment": "100x100",
+            "format": "auto"
+        },
+        "expected": {
+            "type": "image/jpeg",
+            "paths": [
+                {
+                    "path": "https://imgs.example.com/images/test-mov/100x100.jpg",
+                    "width": 100,
+                    "height": 100
+                }
+            ],
+            "all_support": true
+        }
+    },
+    {
+        "id": 65,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssetPath",
+        "args": {
+            "source": "/test.mov",
+            "segment": "100x100",
+            "format": "auto"
+        },
+        "expected": "https://imgs.example.com/images/test-mov/100x100.jpg"
+    },
+    {
+        "id": 66,
+        "options": {
+            "baseURL": "/test-png/"
+        },
+        "method": "GetAssetsHtml",
+        "args": {
+            "source": "/test.jpg",
+            "segments": "x",
+            "formats": [
+                "webp",
+                "auto"
+            ],
+            "dprs": 2
+        },
+        "expected": "<picture><source type=\"image/webp\" srcset=\"/test-png/test-jpg/x.webp 1x, /test-png/test-jpg/x@2.webp 2x\"><img src=\"/test-png/test-jpg/x.jpg\" srcset=\"/test-png/test-jpg/x.jpg 1x, /test-png/test-jpg/x@2.jpg 2x\"></picture>"
+    },
+    {
+        "id": 67,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/"
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": "100x100",
+            "formats": [
+                "jpeg",
+                "jpg"
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/jpeg",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.jpg",
+                        "width": 100,
+                        "height": 100
+                    }
+                ],
+                "source_format": true,
+                "all_support": true
+            }
+        ]
     }
 ]

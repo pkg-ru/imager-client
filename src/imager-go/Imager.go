@@ -321,27 +321,33 @@ func normalizeSegments(segments any) (int, []normalizedSegment) {
 }
 
 func formatsToList(formats any, defaults []string, defaultFormat, sourceFormat string) []string {
+	var list []string
 	switch t := formats.(type) {
 	case string:
 		if t != "" {
-			return []string{t}
+			list = []string{t}
 		}
 	case []string:
 		if len(t) > 0 {
-			return t
+			list = t
 		}
 	}
 
-	if len(defaults) > 0 {
-		return defaults
+	if len(list) == 0 {
+		if len(defaults) > 0 {
+			list = defaults
+		} else if defaultFormat != "" {
+			list = []string{defaultFormat}
+		} else {
+			list = []string{""}
+		}
 	}
-	if defaultFormat != "" {
-		return []string{defaultFormat}
+
+	resolved := make([]string, len(list))
+	for n, f := range list {
+		resolved[n] = resolveFormat(f, sourceFormat)
 	}
-	if sourceFormat != "" {
-		return []string{sourceFormat}
-	}
-	return []string{""}
+	return dedupeFormats(resolved)
 }
 
 func dprSteps(dpr int) int {
@@ -364,9 +370,7 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 	if outFormat == "" {
 		outFormat = i.Format
 	}
-	if outFormat == "" {
-		outFormat = sourceFormat
-	}
+	outFormat = resolveFormat(outFormat, sourceFormat)
 
 	dprVal := i.resolveDpr(dpr)
 
@@ -396,7 +400,7 @@ func (i *Imager) GetAsset(source string, segment any, format string, dpr any) As
 		Type:  mimeFor(outFormat),
 		Paths: []AssetPath{item},
 	}
-	if outFormat == sourceFormat {
+	if normalizeFormat(outFormat) == normalizeFormat(sourceFormat) {
 		asset.SourceFormat = boolPtr(true)
 	}
 	if outFormat == "jpg" || outFormat == "jpeg" || outFormat == "gif" || outFormat == "png" {
@@ -437,11 +441,8 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 	pathsPerFormat := segCount * maxSteps
 
 	result := make([]AssetType, nFmt)
-	for fi := 0; fi < nFmt; fi++ {
+	for fi := range nFmt {
 		eff := fmtList[fi]
-		if eff == "" {
-			eff = sourceFormat
-		}
 
 		paths := make([]AssetPath, pathsPerFormat)
 		pos := 0
@@ -509,7 +510,7 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 			Type:  mimeFor(eff),
 			Paths: paths,
 		}
-		if eff == sourceFormat {
+		if normalizeFormat(eff) == normalizeFormat(sourceFormat) {
 			result[fi].SourceFormat = boolPtr(true)
 		}
 		if eff == "jpg" || eff == "jpeg" || eff == "gif" || eff == "png" {
@@ -529,9 +530,7 @@ func (i *Imager) GetAssetPath(source string, segment any, format string, dpr any
 	if outFormat == "" {
 		outFormat = i.Format
 	}
-	if outFormat == "" {
-		outFormat = sourceFormat
-	}
+	outFormat = resolveFormat(outFormat, sourceFormat)
 
 	prefix := i.urlPrefix(path, sourceName, sourceFormat)
 	dprVal := i.resolveDpr(dpr)

@@ -143,6 +143,17 @@ export default defineNuxtPlugin((nuxtApp) => {
 
 `formats` принимает и строку с запятыми: `formats="webp, avif"`.
 
+Формат `"auto"` (или пустая строка) означает формат исходника; если исходник
+не картинка (видео, нет расширения) — подставляется `jpg`. Список `formats`
+дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются (первое
+вхождение сохраняет позицию). Поддерживаемые форматы картинок:
+`jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+
+```vue
+<ImagerAssets src="/test.jpg" width="100" height="100" formats="webp, avif, jpg, webp, auto" />
+<!-- → webp, avif, jpg (дубли удалены, auto → jpg) -->
+```
+
 ## Компоненты
 
 - `ImagerPlugin` — `app.use()`: создаёт `Imager` из options и `provide` его;

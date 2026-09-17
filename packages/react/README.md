@@ -170,6 +170,17 @@ export const imager = new Imager({ baseURL: "https://imgs.example.com/images/", 
 
 Приоритет сегмента: `segment` > `preset` > `width`/`height`.
 
+Формат `"auto"` (или пустая строка) означает формат исходника; если исходник
+не картинка (видео, нет расширения) — подставляется `jpg`. Список `formats`
+дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются (первое
+вхождение сохраняет позицию). Поддерживаемые форматы картинок:
+`jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+
+```tsx
+<ImagerAssets src="/test.jpg" width={100} height={100} formats={["webp", "avif", "jpg", "webp", "auto"]} />
+{/* → webp, avif, jpg (дубли удалены, auto → jpg) */}
+```
+
 ## Компоненты
 
 - `ImagerPlugin` — глобальная инициализация (`install(options)` / `set(imager)`);

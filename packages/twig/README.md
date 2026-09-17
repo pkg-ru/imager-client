@@ -63,6 +63,17 @@ $twig->addExtension(new ImagerTwigExtension(new Imager([
 
 Приоритет сегмента: `segment` > `preset` > `width`/`height`.
 
+Формат `'auto'` (или пустая строка) означает формат исходника; если исходник
+не картинка (видео, нет расширения) — подставляется `jpg`. Список `formats`
+дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются (первое
+вхождение сохраняет позицию). Поддерживаемые форматы картинок:
+`jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+
+```twig
+{{ imager_assets('/test.jpg', {width: 100, height: 100, formats: ['webp', 'avif', 'jpg', 'webp', 'auto']})|raw }}
+{# → webp, avif, jpg (дубли удалены, auto → jpg) #}
+```
+
 HTML-атрибуты: `alt`, `sizes`, `loading`/`lazy` → `<img>`; `class`, `id`, `style` → `<picture>`.
 Вывод через `|raw` — строка строится пакетом, escape выполняет ядро.
 

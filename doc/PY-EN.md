@@ -39,8 +39,8 @@ imager = Imager(options: ImagerOptions | dict | None = None)
 |---|---|---|---|
 | `token` | `str` | `""` | admin method token (only `AdminGenerate`/`AdminDelete`) |
 | `dpr` | `int` | `0` | default dpr; 0-1 = not used, 2-3 = used |
-| `format` | `str` | `""` | default generation format (empty — source format) |
-| `formats` | `list[str]` | `[]` | default format list; if empty — `format` is used |
+| `format` | `str` | `""` | default generation format (`""`/`"auto"` — source format; if the source is not an image — `jpg`) |
+| `formats` | `list[str]` | `[]` | default format list; if empty — `format` is used; duplicates are removed (`jpeg` → `jpg`) |
 | `baseURL` | `str` | `"/"` | asset URL base; normalized (always trailing `/`) |
 | `adminURL` | `str` | `""` | admin API base URL (no trailing `/`) |
 
@@ -76,7 +76,7 @@ Returns a **single** `AssetType`. `paths` contains all dpr variants from 1 to th
 |---|---|---|
 | `source` | `str` | path to the source (`/test.gif`, `test.gif`, `thumbs/photo.jpg`) |
 | `segment` | `str` \| `{width,height}` \| `[w,h]` \| `None` | segment; not set → `"x"` |
-| `format` | `str` \| `None` | output format; not set → `format` option → source format |
+| `format` | `str` \| `None` | output format; `"auto"`/`""` → source format (if the source is not an image — `jpg`); not set → `format` option → source format |
 | `dpr` | `int` \| `str` \| `None` | final dpr; not set → `dpr` option; < 1 → not used |
 
 ### GetAssets
@@ -92,6 +92,16 @@ def GetAssets(
 ```
 
 Returns a **list** of `AssetType` — one per format (all assets with the same type are merged into a single `AssetType`). Inside `paths` the order is **segment-major**: for each segment all dpr steps in a row. The `dpr` of each path is recalculated from actual sizes: the base is the width (or height) of the first participant with a known size, `dpr = actual width / base width`. `segments` not set → `["x"]`. `formats` not set → `formats` option → `[format]` → `[source format]`.
+
+The format list is deduplicated: `jpeg` is normalized to `jpg`, duplicates are removed (the first occurrence keeps its position). An `"auto"` (or `""`) element means the source file format; if the source is not an image (video, no extension) — `jpg` is used. Supported image formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+
+```python
+imager.GetAssets("/test.jpg", "100x100", ["webp", "avif", "jpg", "webp", "auto"])  # → webp, avif, jpg
+imager.GetAssets("/test.jpg", "100x100", ["webp", "auto"])                         # → webp, jpg
+imager.GetAssets("/test.jpg", "100x100", ["jpg", "auto"])                          # → jpg
+imager.GetAssets("/test.mov", "100x100", ["jpg", "auto"])                          # → jpg
+imager.GetAssets("/test.jpg", "100x100", ["webp", "jpg", "auto"])                  # → webp, jpg
+```
 
 ### GetAssetsHtml
 

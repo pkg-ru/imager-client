@@ -1,5 +1,7 @@
 package imager
 
+import "strings"
+
 // Типы и структуры клиентской библиотеки imager (Go-реализация).
 //
 // Содержит:
@@ -34,6 +36,57 @@ type AssetType struct {
 // boolPtr — вспомогательная функция для установки опциональных bool-полей.
 func boolPtr(v bool) *bool {
 	return &v
+}
+
+// imageFormats — форматы картинок, поддерживаемые сервисом. Всё, что не
+// входит в этот список (видео и прочее), при format="auto"/"" трактуется
+// как не-картинка.
+var imageFormats = map[string]bool{
+	"jpg":  true,
+	"jpeg": true,
+	"png":  true,
+	"webp": true,
+	"avif": true,
+	"heif": true,
+	"heic": true,
+	"apng": true,
+	"jxl":  true,
+	"gif":  true,
+}
+
+// normalizeFormat — нормализация формата: lower-case, jpeg → jpg.
+func normalizeFormat(format string) string {
+	if format == "jpeg" {
+		return "jpg"
+	}
+	return strings.ToLower(format)
+}
+
+// resolveFormat — резолв одного формата: "auto"/"" → исходный формат,
+// если он картинка, иначе jpg.
+func resolveFormat(format, sourceFormat string) string {
+	if format == "auto" || format == "" {
+		if imageFormats[sourceFormat] {
+			return sourceFormat
+		}
+		return "jpg"
+	}
+	return normalizeFormat(format)
+}
+
+// dedupeFormats — дедупликация списка форматов (jpeg → jpg, первое
+// вхождение сохраняет позицию).
+func dedupeFormats(formats []string) []string {
+	seen := make(map[string]bool, len(formats))
+	result := make([]string, 0, len(formats))
+	for _, fmt := range formats {
+		fmt = normalizeFormat(fmt)
+		if !seen[fmt] {
+			seen[fmt] = true
+			result = append(result, fmt)
+		}
+	}
+	return result
 }
 
 // Настройки конструктора Imager.

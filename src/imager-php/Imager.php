@@ -172,7 +172,10 @@ final class Imager
     {
         [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
         [$segStr, $isSize, $width, $height] = self::normalizeSegment($segment);
-        $outFormat = ($format !== null && $format !== '') ? (string) $format : ($this->format !== '' ? $this->format : $sourceFormat);
+        $outFormat = resolve_format(
+            ($format !== null && $format !== '') ? (string) $format : $this->format,
+            $sourceFormat
+        );
         $dprVal = self::parseDpr($dpr !== null ? $dpr : $this->dpr);
 
         $name = $sourceFormat !== '' ? $sourceName . '-' . $sourceFormat : $sourceName;
@@ -198,7 +201,7 @@ final class Imager
         $result = new AssetType();
         $result->type = mime_for($outFormat);
         $result->paths = [$item];
-        if ($outFormat === $sourceFormat) {
+        if (normalize_format($outFormat) === normalize_format($sourceFormat)) {
             $result->source_format = true;
         }
         if ($outFormat === 'jpg' || $outFormat === 'jpeg' || $outFormat === 'gif' || $outFormat === 'png') {
@@ -240,14 +243,20 @@ final class Imager
         }
 
         [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
-        if (!$fmtList) {
-            if ($this->formats) {
-                $fmtList = $this->formats;
-            } elseif ($this->format !== '') {
-                $fmtList = [$this->format];
-            } else {
-                $fmtList = $sourceFormat !== '' ? [$sourceFormat] : [''];
-            }
+        if ($fmtList) {
+            $fmtList = dedupe_formats(array_map(
+                static fn (string $f): string => resolve_format($f, $sourceFormat),
+                $fmtList
+            ));
+        } elseif ($this->formats) {
+            $fmtList = dedupe_formats(array_map(
+                static fn (string $f): string => resolve_format($f, $sourceFormat),
+                $this->formats
+            ));
+        } elseif ($this->format !== '') {
+            $fmtList = [resolve_format($this->format, $sourceFormat)];
+        } else {
+            $fmtList = [resolve_format('', $sourceFormat)];
         }
 
         $dprVal = $this->resolveDpr($dprs);
@@ -297,10 +306,10 @@ final class Imager
         $sourceFlags = [];
         $supportFlags = [];
         foreach ($fmtList as $fmt) {
-            $effective = $fmt !== '' ? $fmt : $sourceFormat;
+            $effective = $fmt;
             $effectiveFormats[] = $effective;
             $mimes[] = mime_for($effective);
-            $sourceFlags[] = $effective === $sourceFormat;
+            $sourceFlags[] = normalize_format($effective) === normalize_format($sourceFormat);
             $supportFlags[] = isset(self::ALL_SUPPORT[$effective]);
         }
 
@@ -522,14 +531,20 @@ final class Imager
         }
 
         [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
-        if (!$fmtList) {
-            if ($this->formats) {
-                $fmtList = $this->formats;
-            } elseif ($this->format !== '') {
-                $fmtList = [$this->format];
-            } else {
-                $fmtList = $sourceFormat !== '' ? [$sourceFormat] : [''];
-            }
+        if ($fmtList) {
+            $fmtList = dedupe_formats(array_map(
+                static fn (string $f): string => resolve_format($f, $sourceFormat),
+                $fmtList
+            ));
+        } elseif ($this->formats) {
+            $fmtList = dedupe_formats(array_map(
+                static fn (string $f): string => resolve_format($f, $sourceFormat),
+                $this->formats
+            ));
+        } elseif ($this->format !== '') {
+            $fmtList = [resolve_format($this->format, $sourceFormat)];
+        } else {
+            $fmtList = [resolve_format('', $sourceFormat)];
         }
 
         $dprVal = $this->resolveDpr($dprs);
@@ -601,12 +616,12 @@ final class Imager
         $groupIndex = [];
 
         foreach ($fmtList as $fmt) {
-            $effectiveFmt = $fmt !== '' ? $fmt : $sourceFormat;
+            $effectiveFmt = $fmt;
             $mime = mime_for($effectiveFmt);
 
             if (isset($groupIndex[$mime])) {
                 $gi = $groupIndex[$mime];
-                if ($effectiveFmt === $sourceFormat) {
+                if (normalize_format($effectiveFmt) === normalize_format($sourceFormat)) {
                     $groups[$gi]['source_format'] = true;
                 }
                 if (isset(self::ALL_SUPPORT[$effectiveFmt])) {
@@ -618,7 +633,7 @@ final class Imager
                 $groups[] = [
                     'type' => $mime,
                     'paths' => [],
-                    'source_format' => $effectiveFmt === $sourceFormat,
+                    'source_format' => normalize_format($effectiveFmt) === normalize_format($sourceFormat),
                     'all_support' => isset(self::ALL_SUPPORT[$effectiveFmt]),
                 ];
             }
@@ -737,7 +752,10 @@ final class Imager
     {
         [$path, $sourceName, $sourceFormat] = self::splitSource((string) $source);
         [$segStr] = self::normalizeSegment($segment);
-        $outFormat = ($format !== null && $format !== '') ? (string) $format : ($this->format !== '' ? $this->format : $sourceFormat);
+        $outFormat = resolve_format(
+            ($format !== null && $format !== '') ? (string) $format : $this->format,
+            $sourceFormat
+        );
         $dprVal = self::parseDpr($dpr !== null ? $dpr : $this->dpr);
         if ($dprVal >= 2) {
             $segStr .= '@' . $dprVal;
