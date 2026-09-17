@@ -2,8 +2,8 @@
 
 Клиент микросервиса **Imager** на Python: построение путей/URL ассетов и админ-методы.
 
-- [English version](https://gitverse.ru/pkg-ru/imager-client/blob/master/doc/PY-EN.md)
-- [Обзор](https://gitverse.ru/pkg-ru/imager-client/blob/master/README.md)
+- [English version](./PY-EN.md)
+- [Обзор](../README.md)
 - [Демо](https://altuh.ru/demo/imager) — пример работы микросервиса и клиентской части
 
 ---
@@ -35,14 +35,23 @@ from imager import AssetType, AssetPath, ImagerOptions, ImagerServerOptions, Seg
 imager = Imager(options: ImagerOptions | dict | None = None)
 ```
 
+Класс `Imager` использует `__slots__` (фиксированный набор полей, без `__dict__`).
+
+### ImagerOptions vs ImagerServerOptions
+
+- [`ImagerOptions`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) — TypedDict клиентской части: `dpr`, `format`, `formats`, `baseURL`, `sort`. **Не содержит** `token`/`adminURL`.
+- `ImagerServerOptions(ImagerOptions)` — расширяет его полями `token`, `adminURL` (для админ-методов).
+
+Конструктор `Imager` принимает любой dict и читает из него все семь ключей (включая `token`/`adminURL`), поэтому для админ-методов можно передавать как `ImagerServerOptions`, так и обычный dict. Типизация `ImagerOptions` просто не описывает серверные ключи.
+
 | Опция | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `token` | `str` | `""` | токен админ-методов (только `AdminGenerate`/`AdminDelete`) |
+| `token` | `str` | `""` | токен админ-методов (только `AdminGenerate`/`AdminDelete`); есть в `ImagerServerOptions` |
 | `dpr` | `int` | `0` | итоговое dpr по умолчанию; 0-1 — не используется, 2-3 — используется |
 | `format` | `str` | `""` | формат генерации по умолчанию (`""`/`"auto"` — формат исходника; если исходник не картинка — `jpg`) |
 | `formats` | `list[str]` | `[]` | список форматов по умолчанию; если пуст — используется `format`; дубли удаляются (`jpeg` → `jpg`) |
 | `baseURL` | `str` | `"/"` | база URL ассетов; нормализуется (всегда с завершающим `/`) |
-| `adminURL` | `str` | `""` | базовый URL админ-API (без завершающего `/`) |
+| `adminURL` | `str` | `""` | базовый URL админ-API (без завершающего `/`); есть в `ImagerServerOptions` |
 | `sort` | `bool` | `False` | сортировать размерные сегменты в `GetAssets` по `width`/`height` (см. ниже) |
 
 Нормализация `baseURL`: пустой/не задан → `"/"`; без завершающего `/` → добавляется. `adminURL`: завершающий `/` удаляется.
@@ -144,7 +153,7 @@ def GetAssetsHtml(
 
 Правила:
 
-- Атрибуты выводятся в алфавитном порядке имён (детерминированный вывод).
+- Атрибуты выводятся в порядке вставки (порядок ключей dict/options); никакой сортировки не выполняется.
 - Булевы атрибуты (`lazy: true`, `loading: true`) — без значения; `false`/`null` — пропускаются.
 - Значения HTML-экранируются (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Внутри `<picture>` теги делятся по типу (формату): все пути одного формата объединяются в один `srcset`.
@@ -155,6 +164,7 @@ def GetAssetsHtml(
 - `width`/`height` на `<img>` добавляются из базового (первого) path, если известны — для CLS. Если пользователь задал свои `width`/`height` (напрямую или через `imgAttrs`) — автоматические не добавляются (без дублирования).
 - `imgAttrs` объединяется с перенаправленными img-атрибутами (`alt`, `sizes`, `loading`, `width`, `height`, `decoding`, `fetchpriority`): значения из `imgAttrs` имеют приоритет. Сам ключ `imgAttrs` в `<picture>` не попадает.
 - Если ассетов нет — возвращается пустая строка.
+- Python-реализация при пустом результате `GetAssets` бросает `IndexError` (обращение к `paths[0]`) — известная особенность, см. [README](https://gitverse.ru/pkg-ru/imager-client/blob/master/README.md).
 
 Пример:
 
@@ -267,7 +277,7 @@ def AdminDelete(
 ```python
 class AssetPath(TypedDict, total=False):
     path: str
-    dpr: int
+    dpr: int | float
     width: int
     height: int
 
@@ -297,9 +307,19 @@ class AssetType(TypedDict):
 - `path` — полный URL, всегда.
 - `dpr` — при dpr ≥ 2; `dpr: 1` — только если в группе есть путь с `dpr > 1` (иначе 1x — дефолтный дескриптор, без поля).
 - `width`/`height` — только для size-сегмента (`200x200`, `{w,h}`, `[w,h]`, `x` и т.п.); при dpr ≥ 2 умножаются на dpr. Для именованного пресета не добавляются.
-- `type` — MIME итогового формата; видео (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) и неизвестный формат → `""`.
+- `type` — MIME итогового формата: всегда `"image/" + format` (для `jpg` — `image/jpeg`). Пустая строка невозможна: `mime_for` определён для любого формата.
 - `source_format` — `true`, если итоговый формат совпадает с исходным форматом файла; в JSON присутствует только при `true`.
 - `all_support` — `true`, если итоговый формат ∈ {`jpg`, `jpeg`, `gif`, `png`} (поддерживается всеми браузерами); в JSON присутствует только при `true`.
+
+### Функции форматов
+
+Модуль [`imager.ImagerTypes`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) экспортирует:
+
+- `IMAGE_FORMATS` — frozenset поддерживаемых форматов картинок: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Всё, что не входит в список (видео и прочее), при `format="auto"/""` трактуется как не-картинка.
+- `normalize_format(format)` — нормализация: lower-case, `jpeg` → `jpg`.
+- `resolve_format(format, source_format)` — резолв одного формата: `"auto"`/`""` → исходный формат, если он картинка, иначе `jpg`.
+- `dedupe_formats(formats)` — дедупликация списка форматов (`jpeg` → `jpg`, первое вхождение сохраняет позицию).
+- `mime_for(format)` — MIME по итоговому формату: всегда `"image/" + format` (для `jpg` — `image/jpeg`). Не входит в `__all__` пакета, но доступен через `from imager.ImagerTypes import mime_for`.
 
 ### MIME по формату
 
@@ -332,6 +352,10 @@ imager.GetAsset("/test.gif", "200x200", "webp", 2)       # + dpr
 imager.GetAsset("/test.gif", "200x200", "webp", "2")     # dpr строкой
 imager.GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2)  # 2 ассета (по одному на формат)
 ```
+
+## Кэш source
+
+`Imager` кэширует разбор последнего source (`_src_cache`: source → path, имя, формат, префикс). Повторные вызовы методов с **тем же** `source` переиспользуют разбор и работают быстрее. Кэш хранит только одну запись — при смене source происходит полный пересчёт. Это внутренняя оптимизация: на результат она не влияет.
 
 ## Примеры
 

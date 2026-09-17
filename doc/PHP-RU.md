@@ -21,7 +21,7 @@ composer require pkg-ru/imager-client
 ```json
 {
     "require": {
-        "pkg-ru/imager-client": "^1.0"
+        "pkg-ru/imager-client": "^2.0"
     }
 }
 ```
@@ -81,13 +81,10 @@ $imager = new Imager([
 ### GetAsset
 
 ```php
-public function GetAsset(
-    string $source,
-    Segment|array|string|null $segment = null,
-    ?string $format = null,
-    int|string|null $dpr = null
-): AssetType;
+public function GetAsset($source, $segment = null, $format = null, $dpr = null): AssetType;
 ```
+
+Все параметры — `mixed` без type-hint (приводятся внутри метода: `(string)`, `(int)` и т.д.). Возвращаемое значение типизировано.
 
 Возвращает **один** `AssetType`. `paths` содержит все варианты dpr от 1 до итогового.
 
@@ -101,13 +98,10 @@ public function GetAsset(
 ### GetAssets
 
 ```php
-public function GetAssets(
-    string $source,
-    mixed $segments = null,   // Segment | Segment[]
-    mixed $formats = null,    // string | string[]
-    int|string|null $dprs = null
-): array;                     // AssetType[]
+public function GetAssets($source, $segments = null, $formats = null, $dprs = null): array;  // AssetType[]
 ```
+
+Все параметры — `mixed` без type-hint.
 
 Возвращает **список** `AssetType` — по одному на каждый формат (все ассеты с одинаковым типом объединяются в один `AssetType`). Внутри `paths` порядок **сегмент-мажорный**: для каждого сегмента все dpr-шаги подряд. `dpr` каждого пути пересчитывается из фактических размеров: база — ширина (или высота) первого участника с известным размером, `dpr = фактическая ширина / базовая ширина`. `segments` не задан → `["x"]`. `formats` не задан → настройки `formats` → `[format]` → `[формат исходника]`.
 
@@ -124,14 +118,10 @@ $imager->GetAssets("/test.jpg", "100x100", ["webp", "jpg", "auto"]);            
 ### GetAssetsHtml
 
 ```php
-public function GetAssetsHtml(
-    string $source,
-    mixed $segments = null,   // Segment | Segment[]
-    mixed $formats = null,    // string | string[]
-    int|string|null $dprs = null,
-    ?array $options = null    // HTML-атрибуты
-): string;
+public function GetAssetsHtml($source, $segments = null, $formats = null, $dprs = null, $options = null): string;
 ```
+
+Все параметры — `mixed` без type-hint (`$options` — массив HTML-атрибутов).
 
 Возвращает **строку** — HTML-разметку `<picture>`/`<img>` по тем же ассетам, что и `GetAssets` (ассеты группируются по типу). Один вызов генерирует ровно один тег `<picture>` (или `<img>`, если формат один).
 
@@ -148,7 +138,7 @@ public function GetAssetsHtml(
 
 Правила:
 
-- Атрибуты выводятся в алфавитном порядке имён (детерминированный вывод).
+- Атрибуты выводятся в порядке вставки (порядок ключей массива `$options`); никакой сортировки не выполняется.
 - Булевы атрибуты (`lazy: true`, `loading: true`) — без значения; `false`/`null` — пропускаются.
 - Значения HTML-экранируются (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Внутри `<picture>` теги делятся по типу (формату): все пути одного формата объединяются в один `srcset`.
@@ -182,29 +172,30 @@ $html = $imager->GetAssetsHtml(
 ### GetAssetPath
 
 ```php
-public function GetAssetPath(
-    string $source,
-    mixed $segment = null,
-    ?string $format = null,
-    int|string|null $dpr = null
-): string;
+public function GetAssetPath($source, $segment = null, $format = null, $dpr = null): string;
 ```
+
+Все параметры — `mixed` без type-hint.
 
 Возвращает **строку** — URL основного варианта ассета. Эквивалент `GetAsset(...)->paths[0]->path`.
 
 ### AdminGenerate
 
 ```php
-public function AdminGenerate(AssetType|AssetType[]|string[]|string $target, bool $wait = false): bool;
+public function AdminGenerate($target, bool $wait = false): bool;
 ```
+
+`$target` — `mixed` без type-hint (см. маппинг ниже).
 
 `POST {adminURL}/admin/assets/generate`, заголовок `Authorization: Bearer <token>`. Возвращает `true` при HTTP 200/202, иначе `false`.
 
 ### AdminDelete
 
 ```php
-public function AdminDelete(AssetType|AssetType[]|string[]|string $target, bool $wait = false): bool;
+public function AdminDelete($target, bool $wait = false): bool;
 ```
+
+`$target` — `mixed` без type-hint (см. маппинг ниже).
 
 `DELETE {adminURL}/admin/assets/delete` — то же тело и заголовок. Возвращает `true` при HTTP 200, иначе `false`.
 
@@ -221,7 +212,7 @@ public function AdminDelete(AssetType|AssetType[]|string[]|string $target, bool 
 - `AssetType` / `AssetType[]` — режим B: собираются все `paths[].path` в один список `assets`.
 - `string[]` — режим B: элементы — **уже готовые пути** к ассетам, передаются в `assets` **как есть**, без валидации и без преобразований.
 
-Если `token` или `adminURL` пусты — админ-методы возвращают `false` **без** HTTP-запроса. HTTP-клиент — `curl_*` (расширение `ext-curl`).
+Если `token` или `adminURL` пусты — админ-методы возвращают `false` **без** HTTP-запроса. HTTP-клиент — `curl_*` (расширение `ext-curl`), timeout 10 секунд.
 
 ## Segment
 
@@ -262,7 +253,7 @@ public function AdminDelete(AssetType|AssetType[]|string[]|string $target, bool 
 ```php
 final class AssetPath {
     public string $path = "";
-    public ?int $dpr = null;
+    public ?float $dpr = null;
     public ?int $width = null;
     public ?int $height = null;
 }
@@ -297,9 +288,19 @@ final class AssetType {
 - `path` — полный URL, всегда.
 - `dpr` — при dpr ≥ 2; `dpr: 1` — только если в группе есть путь с `dpr > 1` (иначе 1x — дефолтный дескриптор, без поля).
 - `width`/`height` — только для size-сегмента (`200x200`, `{w,h}`, `[w,h]`, `x` и т.п.); при dpr ≥ 2 умножаются на dpr. Для именованного пресета не добавляются.
-- `type` — MIME итогового формата; видео (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) и неизвестный формат → `""`.
+- `type` — MIME итогового формата: всегда `"image/" + format` (для `jpg` — `image/jpeg`). Пустая строка невозможна: `mime_for` определён для любого формата.
 - `source_format` — `true`, если итоговый формат совпадает с исходным форматом файла; в JSON присутствует только при `true`.
 - `all_support` — `true`, если итоговый формат ∈ {`jpg`, `jpeg`, `gif`, `png`} (поддерживается всеми браузерами); в JSON присутствует только при `true`.
+
+### Глобальные функции форматов
+
+Файл [`ImagerTypes.php`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-php/ImagerTypes.php) (namespace `imagerClient\`, подключается через `autoload.files`) определяет:
+
+- `IMAGE_FORMATS` — константа-массив поддерживаемых форматов картинок: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Всё, что не входит в список (видео и прочее), при `format="auto"/""` трактуется как не-картинка.
+- `normalize_format(string $format): string` — нормализация: lower-case, `jpeg` → `jpg`.
+- `resolve_format(string $format, string $source_format): string` — резолв одного формата: `"auto"`/`""` → исходный формат, если он картинка, иначе `jpg`.
+- `dedupe_formats(array $formats): array` — дедупликация списка форматов (`jpeg` → `jpg`, первое вхождение сохраняет позицию).
+- `mime_for(string $format): string` — MIME по итоговому формату: всегда `"image/" + format` (для `jpg` — `image/jpeg`).
 
 ### MIME по формату
 

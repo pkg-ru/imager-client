@@ -85,6 +85,8 @@ const imager = new ImagerServer(options?: ImagerServerOptions | null);
 
 Нормализация `baseURL`: пустой/не задан → `"/"`; без завершающего `/` → добавляется. `adminURL`: завершающий `/` удаляется.
 
+Класс `Imager` кэширует разбор последнего source (`_lastSource`/`_lastPrefix`/`_lastSourceFormat`): повторные вызовы с тем же `source` переиспользуют разбор. Кэш хранит одну запись и не влияет на результат.
+
 ```ts
 // Клиент (браузер)
 const imager = new Imager({
@@ -155,7 +157,7 @@ imager.GetAssets("/test.jpg", "100x100", ["webp", "jpg", "auto"]);              
 
 Правила:
 
-- Атрибуты выводятся в алфавитном порядке имён (детерминированный вывод).
+- Атрибуты выводятся в порядке вставки (порядок ключей объекта `options`); никакой сортировки не выполняется.
 - Булевы атрибуты (`lazy: true`, `loading: true`) — без значения; `false`/`null` — пропускаются.
 - Значения HTML-экранируются (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Внутри `<picture>` теги делятся по типу (формату): все пути одного формата объединяются в один `srcset`.
@@ -318,9 +320,33 @@ interface AssetType {
 - `path` — полный URL, всегда.
 - `dpr` — при dpr ≥ 2; `dpr: 1` — только если в группе есть путь с `dpr > 1` (иначе 1x — дефолтный дескриптор, без поля).
 - `width`/`height` — только для size-сегмента (`200x200`, `{w,h}`, `[w,h]`, `x` и т.п.); при dpr ≥ 2 умножаются на dpr. Для именованного пресета не добавляются.
-- `type` — MIME итогового формата; видео (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) и неизвестный формат → `""`.
+- `type` — MIME итогового формата: всегда `"image/" + format` (для `jpg` — `image/jpeg`). Пустая строка невозможна: `mimeFor` определён для любого формата.
 - `source_format` — `true`, если итоговый формат совпадает с исходным форматом файла; в JSON присутствует только при `true`.
 - `all_support` — `true`, если итоговый формат ∈ {`jpg`, `jpeg`, `gif`, `png`} (поддерживается всеми браузерами); в JSON присутствует только при `true`.
+
+### Экспорты
+
+Клиентская точка входа [`imager-client`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts/index.ts) экспортирует:
+
+- Классы/типы: `Imager` (и default), `AssetPath`, `AssetType`, `ImagerOptions`, `Segment`, `mimeFor`
+- Компонентный слой (`component.ts`): `normalizeProps`, `ImagerComponentProps`, `NormalizedCall`, `NormalizePropsOptions`
+- Рендер-слой (`render.ts`): `IMG_ATTRS`, `HtmlGroup`, `buildSrcset`, `fmtDescriptor`, `groupAssets`, `pickImgGroup`, `splitAttrs`, `useWidthDescriptors`
+
+Серверная точка входа [`imager-client/server`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts-server/index.ts) экспортирует: `ImagerServer`, `Imager`, `AssetPath`, `AssetType`, `ImagerOptions`, `ImagerServerOptions`, `Segment`, `mimeFor`.
+
+`normalizeFormat`, `resolveFormat`, `dedupeFormats`, `IMAGE_FORMATS` **не экспортируются** из клиентской точки входа (внутренние функции модуля `ImagerTypes.ts`).
+
+### normalizeProps (component.ts)
+
+`normalizeProps` нормализует алиасы props компонента в аргументы `GetAssets`:
+
+| Алиас | Цель |
+|---|---|
+| `src` | `source` |
+| `preset` | `segment` |
+| `width` / `height` | `segment` (объект `{width, height}`) |
+| `format` | `formats` |
+| `dpr` | `dprs` |
 
 ### MIME по формату
 

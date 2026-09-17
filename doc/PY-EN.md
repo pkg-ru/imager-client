@@ -35,14 +35,23 @@ from imager import AssetType, AssetPath, ImagerOptions, ImagerServerOptions, Seg
 imager = Imager(options: ImagerOptions | dict | None = None)
 ```
 
+The `Imager` class uses `__slots__` (a fixed set of fields, no `__dict__`).
+
+### ImagerOptions vs ImagerServerOptions
+
+- [`ImagerOptions`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) — TypedDict of the client part: `dpr`, `format`, `formats`, `baseURL`, `sort`. **Does not contain** `token`/`adminURL`.
+- `ImagerServerOptions(ImagerOptions)` — extends it with `token`, `adminURL` (for admin methods).
+
+The `Imager` constructor accepts any dict and reads all seven keys from it (including `token`/`adminURL`), so for admin methods you can pass either `ImagerServerOptions` or a plain dict. The `ImagerOptions` typing simply does not describe the server keys.
+
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `token` | `str` | `""` | admin method token (only `AdminGenerate`/`AdminDelete`) |
+| `token` | `str` | `""` | admin method token (only `AdminGenerate`/`AdminDelete`); present in `ImagerServerOptions` |
 | `dpr` | `int` | `0` | default dpr; 0-1 = not used, 2-3 = used |
 | `format` | `str` | `""` | default generation format (`""`/`"auto"` — source format; if the source is not an image — `jpg`) |
 | `formats` | `list[str]` | `[]` | default format list; if empty — `format` is used; duplicates are removed (`jpeg` → `jpg`) |
 | `baseURL` | `str` | `"/"` | asset URL base; normalized (always trailing `/`) |
-| `adminURL` | `str` | `""` | admin API base URL (no trailing `/`) |
+| `adminURL` | `str` | `""` | admin API base URL (no trailing `/`); present in `ImagerServerOptions` |
 | `sort` | `bool` | `False` | sort size segments in `GetAssets` by `width`/`height` (see below) |
 
 `baseURL` normalization: empty/not set → `"/"`; missing trailing `/` → appended. `adminURL`: trailing `/` is stripped.
@@ -144,7 +153,7 @@ Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as 
 
 Rules:
 
-- Attributes are output in alphabetical order of names (deterministic output).
+- Attributes are output in insertion order (the order of dict/options keys); no sorting is performed.
 - Boolean attributes (`lazy: true`, `loading: true`) — without a value; `false`/`null` — skipped.
 - Values are HTML-escaped (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Inside `<picture>` tags are divided by type (format): all paths of one format are merged into a single `srcset`.
@@ -155,6 +164,7 @@ Rules:
 - `width`/`height` on `<img>` are added from the base (first) path when known — for CLS. If the user provided their own `width`/`height` (directly or via `imgAttrs`) — automatic ones are not added (no duplication).
 - `imgAttrs` is merged with forwarded img attributes (`alt`, `sizes`, `loading`, `width`, `height`, `decoding`, `fetchpriority`): values from `imgAttrs` take priority. The `imgAttrs` key itself never lands on `<picture>`.
 - If there are no assets — an empty string is returned.
+- The Python implementation raises `IndexError` on an empty `GetAssets` result (access to `paths[0]`) — a known quirk, see the [README](https://gitverse.ru/pkg-ru/imager-client/blob/master/README.md).
 
 Example:
 
@@ -267,7 +277,7 @@ If `token` or `adminURL` is empty — admin methods return `False` **without** a
 ```python
 class AssetPath(TypedDict, total=False):
     path: str
-    dpr: int
+    dpr: int | float
     width: int
     height: int
 
@@ -297,9 +307,19 @@ Path object field rules:
 - `path` — full URL, always present.
 - `dpr` — when dpr ≥ 2; `dpr: 1` — only if the group has a path with `dpr > 1` (otherwise 1x is the default descriptor, no field).
 - `width`/`height` — only for size segments (`200x200`, `{w,h}`, `[w,h]`, `x`, etc.); multiplied by dpr when dpr ≥ 2. Not added for named presets.
-- `type` — MIME of the output format; video (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) and unknown format → `""`.
+- `type` — MIME of the output format: always `"image/" + format` (for `jpg` — `image/jpeg`). An empty string is impossible: `mime_for` is defined for any format.
 - `source_format` — `true` when the output format matches the source file format; present in JSON only when `true`.
 - `all_support` — `true` when the output format ∈ {`jpg`, `jpeg`, `gif`, `png`} (supported by all browsers); present in JSON only when `true`.
+
+### Format functions
+
+The [`imager.ImagerTypes`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) module exports:
+
+- `IMAGE_FORMATS` — frozenset of supported image formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Anything not in the list (video, etc.) is treated as a non-image when `format="auto"/""`.
+- `normalize_format(format)` — normalization: lower-case, `jpeg` → `jpg`.
+- `resolve_format(format, source_format)` — resolves a single format: `"auto"`/`""` → the source format if it is an image, otherwise `jpg`.
+- `dedupe_formats(formats)` — deduplication of the format list (`jpeg` → `jpg`, the first occurrence keeps its position).
+- `mime_for(format)` — MIME by output format: always `"image/" + format` (for `jpg` — `image/jpeg`). Not in the package `__all__`, but available via `from imager.ImagerTypes import mime_for`.
 
 ### MIME by format
 
@@ -332,6 +352,10 @@ imager.GetAsset("/test.gif", "200x200", "webp", 2)       # + dpr
 imager.GetAsset("/test.gif", "200x200", "webp", "2")     # dpr as a string
 imager.GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], 2)  # 2 assets (one per format)
 ```
+
+## Source cache
+
+`Imager` caches parsing of the last source (`_src_cache`: source → path, name, format, prefix). Repeated method calls with **the same** `source` reuse the parsed result and run faster. The cache holds a single entry — changing the source triggers a full re-parse. This is an internal optimization: it does not affect the result.
 
 ## Examples
 

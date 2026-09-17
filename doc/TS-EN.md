@@ -85,6 +85,8 @@ const imager = new ImagerServer(options?: ImagerServerOptions | null);
 
 `baseURL` normalization: empty/not set → `"/"`; missing trailing `/` → appended. `adminURL`: trailing `/` is stripped.
 
+The `Imager` class caches parsing of the last source (`_lastSource`/`_lastPrefix`/`_lastSourceFormat`): repeated calls with the same `source` reuse the parsed result. The cache holds a single entry and does not affect the result.
+
 ```ts
 // Client (browser)
 const imager = new Imager({
@@ -155,7 +157,7 @@ Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as 
 
 Rules:
 
-- Attributes are output in alphabetical order of names (deterministic output).
+- Attributes are output in insertion order (the order of keys in the `options` object); no sorting is performed.
 - Boolean attributes (`lazy: true`, `loading: true`) — without a value; `false`/`null` — skipped.
 - Values are HTML-escaped (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Inside `<picture>` tags are divided by type (format): all paths of one format are merged into a single `srcset`.
@@ -318,9 +320,33 @@ Path object field rules:
 - `path` — full URL, always present.
 - `dpr` — when dpr ≥ 2; `dpr: 1` — only if the group has a path with `dpr > 1` (otherwise 1x is the default descriptor, no field).
 - `width`/`height` — only for size segments (`200x200`, `{w,h}`, `[w,h]`, `x`, etc.); multiplied by dpr when dpr ≥ 2. Not added for named presets.
-- `type` — MIME of the output format; video (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) and unknown format → `""`.
+- `type` — MIME of the output format: always `"image/" + format` (for `jpg` — `image/jpeg`). An empty string is impossible: `mimeFor` is defined for any format.
 - `source_format` — `true` when the output format matches the source file format; present in JSON only when `true`.
 - `all_support` — `true` when the output format ∈ {`jpg`, `jpeg`, `gif`, `png`} (supported by all browsers); present in JSON only when `true`.
+
+### Exports
+
+The client entry point [`imager-client`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts/index.ts) exports:
+
+- Classes/types: `Imager` (and default), `AssetPath`, `AssetType`, `ImagerOptions`, `Segment`, `mimeFor`
+- Component layer (`component.ts`): `normalizeProps`, `ImagerComponentProps`, `NormalizedCall`, `NormalizePropsOptions`
+- Render layer (`render.ts`): `IMG_ATTRS`, `HtmlGroup`, `buildSrcset`, `fmtDescriptor`, `groupAssets`, `pickImgGroup`, `splitAttrs`, `useWidthDescriptors`
+
+The server entry point [`imager-client/server`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts-server/index.ts) exports: `ImagerServer`, `Imager`, `AssetPath`, `AssetType`, `ImagerOptions`, `ImagerServerOptions`, `Segment`, `mimeFor`.
+
+`normalizeFormat`, `resolveFormat`, `dedupeFormats`, `IMAGE_FORMATS` are **not exported** from the client entry point (internal functions of the `ImagerTypes.ts` module).
+
+### normalizeProps (component.ts)
+
+`normalizeProps` normalizes component prop aliases into `GetAssets` arguments:
+
+| Alias | Target |
+|---|---|
+| `src` | `source` |
+| `preset` | `segment` |
+| `width` / `height` | `segment` (a `{width, height}` object) |
+| `format` | `formats` |
+| `dpr` | `dprs` |
 
 ### MIME by format
 

@@ -119,7 +119,7 @@ Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as 
 
 Rules:
 
-- Attributes are output in alphabetical order of names (deterministic output).
+- Attributes are output in insertion order (the order of keys in `map[string]any` — nondeterministic in Go, but no sorting is performed).
 - Boolean attributes (`lazy: true`, `loading: true`) — without a value; `false`/`nil` — skipped.
 - Values are HTML-escaped (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Inside `<picture>` tags are divided by type (format): all paths of one format are merged into a single `srcset`.
@@ -187,7 +187,7 @@ func (i *Imager) AdminDelete(target any, wait bool) bool
 - `AssetType` / `[]AssetType` — mode B: all `paths[].path` are collected into a single `assets` list.
 - `[]string` — mode B: the items are **already ready** asset paths, passed to `assets` **as-is**, without validation or transformations.
 
-If `Token` or `AdminURL` is empty — admin methods return `false` **without** an HTTP request. HTTP client — `net/http` (standard library).
+If `Token` or `AdminURL` is empty — admin methods return `false` **without** an HTTP request. HTTP client — `net/http` (standard library). The internal `AdminRequest` method is **synchronous**: it blocks until the response is received.
 
 ## Segment
 
@@ -227,10 +227,10 @@ If `Token` or `AdminURL` is empty — admin methods return `false` **without** a
 
 ```go
 type AssetPath struct {
-    Path   string `json:"path"`
-    Dpr    int    `json:"dpr,omitempty"`
-    Width  int    `json:"width,omitempty"`
-    Height int    `json:"height,omitempty"`
+    Path   string  `json:"path"`
+    Dpr    float64 `json:"dpr,omitempty"`
+    Width  int     `json:"width,omitempty"`
+    Height int     `json:"height,omitempty"`
 }
 
 type AssetType struct {
@@ -260,9 +260,26 @@ Path object field rules:
 - `path` — full URL, always present.
 - `dpr` — when dpr ≥ 2; `dpr: 1` — only if the group has a path with `dpr > 1` (otherwise 1x is the default descriptor, no field).
 - `width`/`height` — only for size segments (`200x200`, `{w,h}`, `[w,h]`, `x`, etc.); multiplied by dpr when dpr ≥ 2. Not added for named presets.
-- `type` — MIME of the output format; video (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) and unknown format → `""`.
+- `type` — MIME of the output format: always `"image/" + format` (for `jpg` — `image/jpeg`). An empty string is impossible: `mimeFor` is defined for any format.
 - `source_format` — `true` when the output format matches the source file format; present in JSON only when `true`.
 - `all_support` — `true` when the output format ∈ {`jpg`, `jpeg`, `gif`, `png`} (supported by all browsers); present in JSON only when `true`.
+
+### Re-export via main.go
+
+The implementation lives in [`src/imager-go/`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-go) (`Imager.go`, `ImagerTypes.go`, package `imager`). The root file [`main.go`](https://gitverse.ru/pkg-ru/imager-client/blob/master/main.go) re-exports the public part via type aliases:
+
+```go
+type Size = inner.Size
+type Imager = inner.Imager
+type AssetPath = inner.AssetPath
+type AssetType = inner.AssetType
+type Options = inner.Options
+func New(options ...Options) *Imager
+```
+
+### Internal functions
+
+The public API is only what is listed above. Internal package functions (not exported): `splitSource`, `parseSizeString`, `normalizeSegment`, `parseDpr`, `toInt`, `buildSize`, `mimeFor`, `normalizeFormat`, `resolveFormat`, `dedupeFormats`, `sortSegments`, `compareSegments`, `buildSrcset`, `fmtDescriptor`, `htmlEscape`, `truthy`, `isImgAttr`, `formatsToList`, `dprSteps`, `boolPtr`.
 
 ### MIME by format
 

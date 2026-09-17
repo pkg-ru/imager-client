@@ -119,7 +119,7 @@ func (i *Imager) GetAssetsHtml(source string, segments any, formats any, dprs an
 
 Правила:
 
-- Атрибуты выводятся в алфавитном порядке имён (детерминированный вывод).
+- Атрибуты выводятся в порядке вставки (порядок ключей `map[string]any` — недетерминирован в Go, но сортировки не выполняется).
 - Булевы атрибуты (`lazy: true`, `loading: true`) — без значения; `false`/`nil` — пропускаются.
 - Значения HTML-экранируются (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Внутри `<picture>` теги делятся по типу (формату): все пути одного формата объединяются в один `srcset`.
@@ -187,7 +187,7 @@ func (i *Imager) AdminDelete(target any, wait bool) bool
 - `AssetType` / `[]AssetType` — режим B: собираются все `paths[].path` в один список `assets`.
 - `[]string` — режим B: элементы — **уже готовые пути** к ассетам, передаются в `assets` **как есть**, без валидации и без преобразований.
 
-Если `Token` или `AdminURL` пусты — админ-методы возвращают `false` **без** HTTP-запроса. HTTP-клиент — `net/http` (стандартная библиотека).
+Если `Token` или `AdminURL` пусты — админ-методы возвращают `false` **без** HTTP-запроса. HTTP-клиент — `net/http` (стандартная библиотека). Внутренний метод `AdminRequest` — **синхронный**: блокирует выполнение до получения ответа.
 
 ## Segment
 
@@ -227,10 +227,10 @@ func (i *Imager) AdminDelete(target any, wait bool) bool
 
 ```go
 type AssetPath struct {
-    Path   string `json:"path"`
-    Dpr    int    `json:"dpr,omitempty"`
-    Width  int    `json:"width,omitempty"`
-    Height int    `json:"height,omitempty"`
+    Path   string  `json:"path"`
+    Dpr    float64 `json:"dpr,omitempty"`
+    Width  int     `json:"width,omitempty"`
+    Height int     `json:"height,omitempty"`
 }
 
 type AssetType struct {
@@ -260,9 +260,26 @@ type AssetType struct {
 - `path` — полный URL, всегда.
 - `dpr` — при dpr ≥ 2; `dpr: 1` — только если в группе есть путь с `dpr > 1` (иначе 1x — дефолтный дескриптор, без поля).
 - `width`/`height` — только для size-сегмента (`200x200`, `{w,h}`, `[w,h]`, `x` и т.п.); при dpr ≥ 2 умножаются на dpr. Для именованного пресета не добавляются.
-- `type` — MIME итогового формата; видео (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) и неизвестный формат → `""`.
+- `type` — MIME итогового формата: всегда `"image/" + format` (для `jpg` — `image/jpeg`). Пустая строка невозможна: `mimeFor` определён для любого формата.
 - `source_format` — `true`, если итоговый формат совпадает с исходным форматом файла; в JSON присутствует только при `true`.
 - `all_support` — `true`, если итоговый формат ∈ {`jpg`, `jpeg`, `gif`, `png`} (поддерживается всеми браузерами); в JSON присутствует только при `true`.
+
+### Реэкспорт через main.go
+
+Реализация находится в [`src/imager-go/`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-go) (`Imager.go`, `ImagerTypes.go`, package `imager`). Корневой файл [`main.go`](https://gitverse.ru/pkg-ru/imager-client/blob/master/main.go) реэкспортирует публичную часть через type aliases:
+
+```go
+type Size = inner.Size
+type Imager = inner.Imager
+type AssetPath = inner.AssetPath
+type AssetType = inner.AssetType
+type Options = inner.Options
+func New(options ...Options) *Imager
+```
+
+### Внутренние функции
+
+Публичный API — только перечисленное выше. Внутренние функции пакета (не экспортируются): `splitSource`, `parseSizeString`, `normalizeSegment`, `parseDpr`, `toInt`, `buildSize`, `mimeFor`, `normalizeFormat`, `resolveFormat`, `dedupeFormats`, `sortSegments`, `compareSegments`, `buildSrcset`, `fmtDescriptor`, `htmlEscape`, `truthy`, `isImgAttr`, `formatsToList`, `dprSteps`, `boolPtr`.
 
 ### MIME по формату
 

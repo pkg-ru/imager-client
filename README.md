@@ -1,83 +1,82 @@
-# [Imager](https://gitverse.ru/pkg-ru/imager) Client
+# Imager Client
 
-Клиентская библиотека микросервиса **Imager** для четырёх языков — Python, PHP, TypeScript и Go — с **идентичным поведением на всех платформах**. Строит пути и URL ассетов (превью, размеры, форматы, retina) и вызывает админ-методы генерации/удаления.
+Клиентская библиотека микросервиса [Imager](https://gitverse.ru/pkg-ru/imager) для четырёх языков — Python, PHP, TypeScript и Go — с единым API и структурно идентичным результатом на всех платформах. Строит canonical URL ассетов (превью, размеры, форматы, retina) и вызывает admin API генерации/удаления.
+
+**Framework integrations:** [React](./packages/react/README.md) · [Vue 3](./packages/vue/README.md) · [Twig](./packages/twig/README.md)
 
 > Для работы нужен настроенный и запущенный [микросервис Imager](https://gitverse.ru/pkg-ru/imager).
 
-> **Основной репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Зеркало:** [GitHub](https://github.com/pkg-ru/imager-client)
+**Основной репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Зеркало:** [GitHub](https://github.com/pkg-ru/imager-client) · **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager)
 
-> **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager) — пример работы микросервиса и клиентской части
-
-## Документация: **RU** / [EN](./doc/README-EN.md)
-
-- [Python](./doc/PY-RU.md) — пакет на [PyPI](https://pypi.org/project/imager_client/)
-- [PHP](./doc/PHP-RU.md) — пакет на [Packagist](https://packagist.org/packages/pkg-ru/imager-client)
-  - [Twig](./packages/twig/README.md) — пакет на [Packagist](https://packagist.org/packages/pkg-ru/imager-twig)
-- [TypeScript (клиент + сервер)](./doc/TS-RU.md) — пакет на [npm](https://www.npmjs.com/package/imager-client)
-  - [Vue](./packages/vue/README.md) — пакет на [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue)
-  - [React](./packages/react/README.md) — пакет на [npm](https://www.npmjs.com/package/@pkg-ru/imager-react)
-- [Go](./doc/GO-RU.md) — модуль на [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2)
+**Документация:** RU / [EN](./doc/README-EN.md)
 
 ---
 
-## Почему Imager Client
+## Overview
 
-- **Один API — четыре языка.** Все реализации дают **побайтово идентичный** JSON-результат на едином наборе golden-тестов: можно строить URL на бэкенде (PHP, Python, Go, Node) и на фронтенде (TS) без расхождений.
-- **Zero-dependency.** Ни одного внешнего пакета: только стандартная библиотека каждого языка (urllib, curl, fetch, net/http).
-- **Мгновенно.** Клиентские методы — чистые функции конкатенации строк: без HTTP, без валидации, без исключений. Генерация миллиона ассетов — практически мгновенно.
-- **Безопасные секреты.** В TypeScript админ-методы вынесены в отдельный серверный импорт `imager-client/server`: токен физически не может попасть в браузерный бандл.
-- **Гибкие параметры.** Сегмент размера можно передавать строкой, объектом или массивом; dpr — числом или строкой; формат — одним или списком. Опция `sort: true` сортирует размерные сегменты в `GetAssets` по `width`/`height` (по возрастанию; сегменты без `width` — в конец) **до** вычисления `dpr`, поэтому все коэффициенты ≥ 1.
+**Imager Service** — микросервис, который по запросу генерирует и отдаёт производные изображения: ресайзы, форматы (webp, avif и др.), retina-варианты.
 
-## Установка
+**Imager Client** — клиентские библиотеки к этому сервису. Клиент не обрабатывает изображения сам: он вычисляет canonical URL ассета по правилам сервиса и, при необходимости, обращается к admin API для генерации или удаления ассетов. Один и тот же URL, построенный на любом из четырёх языков, совпадает — можно строить пути на бэкенде (PHP, Python, Go, Node) и на фронтенде (TypeScript) без расхождений.
 
-| Язык | Пакет | Команда |
-|---|---|---|
-| Python | `imager_client` (PyPI) | `pip install imager_client` |
-| PHP | `pkg-ru/imager-client` (Composer) | `composer require pkg-ru/imager-client` |
-| TypeScript | `imager-client` (npm) | `npm install imager-client` |
-| Go | `gitverse.ru/pkg-ru/imager-client/v2` | `go get gitverse.ru/pkg-ru/imager-client/v2` |
+## Features
 
-## Фреймворк-компоненты
+- **Один API — четыре языка.** Все реализации проходят единый набор golden-тестов и дают структурно идентичный результат (сравнение без учёта порядка ключей).
+- **Без сторонних runtime-библиотек.** Ядро клиента использует только стандартную библиотеку каждого языка (urllib, curl, fetch, net/http). Исключение: PHP требует расширение `ext-curl`.
+- **Гибкие параметры.** Сегмент размера — строкой, объектом или массивом; dpr — числом или строкой; формат — одним или списком. Опция `sort: true` сортирует размерные сегменты в `GetAssets` по `width`/`height` (по возрастанию; сегменты без `width` — в конец) **до** вычисления `dpr`, поэтому все коэффициенты ≥ 1.
+- **Безопасные секреты.** В TypeScript admin-методы вынесены в отдельный серверный импорт `imager-client/server`: токен не попадает в браузерный бандл.
+- **HTML-рендер.** `GetAssetsHtml` строит готовый `<picture>`/`<img>` с `srcset` (w- или x-режим).
 
-Тонкие обёртки над ядром для популярных фреймворков: вся логика (сегменты,
-dpr, форматы, srcset) — в ядре, компоненты нормализуют алиасы props
-(`src`→`source`, `preset`→`segment`, `width`/`height`→сегмент) и рендерят
-нативные узлы фреймворка.
+## Architecture / How it works
 
-**SSR / prerender + hydration.** Плагины **не являются `.client`-only**:
-инстанс `Imager` нужен и на сервере (SSR/prerender формируют `<picture>`
-с `<source>` в HTML), и на клиенте (ts/vue/react — hydration). Ядро — чистые
-функции без DOM/`window`, поэтому один и тот же код даёт **идентичный HTML**
-на сервере и на клиенте. Примеры интеграции: [Next.js](./packages/react/README.md#ssr--prerender--hydration),
-[Nuxt 3](./packages/vue/README.md#ssr--prerender--hydration), SvelteKit.
+```text
+┌─────────────┐   canonical URL    ┌───────────────┐
+│ Imager Client│ ────────────────▶ │ Imager Service │ ──▶ сгенерированный ассет
+│  (4 языка)  │                    │  (генерация)   │
+└─────────────┘                    └───────────────┘
+       │  ▲
+       │  └── admin API: AdminGenerate / AdminDelete (только server-side)
+       └───── клиентские методы — чистые функции, без HTTP
+```
 
-| Пакет | Экосистема | Компоненты | Документация |
+Структура URL: `{baseURL}{path}/{source_name}-{source_format}/{segment}[@{dpr}].{output_format}`
+
+Клиентские методы (`GetAsset`, `GetAssets`, `GetAssetPath`, `GetAssetsHtml`) — чистые функции конкатенации строк: без HTTP-запросов. Admin-методы (`AdminGenerate`, `AdminDelete`) выполняют HTTP-запросы к admin API и доступны только в server-side окружении.
+
+## Supported languages
+
+| Язык | Пакет | Runtime | Установка | Документация |
+|---|---|---|---|---|
+| Python | [`imager_client`](https://pypi.org/project/imager_client/) | Python 3 | `pip install imager_client` | [RU](./doc/PY-RU.md) / [EN](./doc/PY-EN.md) |
+| PHP | [`pkg-ru/imager-client`](https://packagist.org/packages/pkg-ru/imager-client) | PHP ≥ 8.1, ext-curl | `composer require pkg-ru/imager-client` | [RU](./doc/PHP-RU.md) / [EN](./doc/PHP-EN.md) |
+| TypeScript | [`imager-client`](https://www.npmjs.com/package/imager-client) | Node 18+ (для server), браузеры | `npm install imager-client` | [RU](./doc/TS-RU.md) / [EN](./doc/TS-EN.md) |
+| Go | [`gitverse.ru/pkg-ru/imager-client/v2`](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2) | Go ≥ 1.23.7 | `go get gitverse.ru/pkg-ru/imager-client/v2` | [RU](./doc/GO-RU.md) / [EN](./doc/GO-EN.md) |
+
+## Framework integrations
+
+Тонкие обёртки над ядром: вся логика (сегменты, dpr, форматы, srcset) — в ядре, компоненты нормализуют алиасы props (`src`→`source`, `preset`→`segment`, `width`/`height`→сегмент) и рендерят нативные узлы фреймворка.
+
+Плагины **не являются client-only**: инстанс `Imager` нужен и на сервере (SSR/prerender формируют `<picture>` с `<source>` в HTML), и на клиенте (hydration). Ядро — чистые функции без DOM/`window`, поэтому один и тот же код даёт идентичный HTML на сервере и на клиенте. Примеры интеграции: [Next.js](./packages/react/README.md#ssr--prerender--hydration), [Nuxt 3](./packages/vue/README.md#ssr--prerender--hydration), SvelteKit.
+
+| Фреймворк | Пакет | Требования | Документация |
 |---|---|---|---|
-| `@pkg-ru/imager-react` | npm, peer: react ≥17 | `ImagerPlugin`, `ImagerProvider`, `ImagerAssets`, `ImagerAsset` | [README](./packages/react/README.md) |
-| `@pkg-ru/imager-vue` | npm, peer: vue ≥3.2 | `ImagerPlugin`, `ImagerProvider`, `ImagerAssets`, `ImagerAsset` | [README](./packages/vue/README.md) |
-| `pkg-ru/imager-twig` | composer, twig ≥3 | функции `imager_assets`, `imager_asset`, `imager_assets_raw` | [README](./packages/twig/README.md) |
+| React | [`@pkg-ru/imager-react`](https://www.npmjs.com/package/@pkg-ru/imager-react) | react ≥ 17 | [README](./packages/react/README.md) |
+| Vue | [`@pkg-ru/imager-vue`](https://www.npmjs.com/package/@pkg-ru/imager-vue) | vue ≥ 3.2 | [README](./packages/vue/README.md) |
+| Twig | [`pkg-ru/imager-twig`](https://packagist.org/packages/pkg-ru/imager-twig) | PHP ≥ 8.0, twig ^3.0 | [README](./packages/twig/README.md) |
 
-Пакеты **самодостаточны**: ядро встроено в бандл, `imager-client` — опциональный peerDependency
-(нужен только для своего инстанса, например `ImagerServer` с админ-методами).
+Пакеты самодостаточны: ядро встроено в бандл, `imager-client` — опциональный peerDependency (нужен только для своего инстанса, например `ImagerServer` с admin-методами).
 
-```tsx
-// React: глобальная инициализация
-ImagerPlugin.install({ baseURL: "...", format: "webp", dpr: 2 });
+## Installation
 
-<ImagerAssets src="/test.png" width={200} height={200} dpr={2} format="webp" alt="Фото" />
-```
-
-```ts
-// Vue: глобальная инициализация через app.use
-createApp(App).use(ImagerPlugin, { baseURL: "...", format: "webp", dpr: 2 }).mount("#app");
-```
-
-```twig
-{# Twig: расширение с imager-сервисом #}
-{{ imager_assets('/test.png', {preset: 'thumb', format: 'webp', alt: 'Фото'})|raw }}
+```bash
+pip install imager_client          # Python
+composer require pkg-ru/imager-client   # PHP
+npm install imager-client          # TypeScript
+go get gitverse.ru/pkg-ru/imager-client/v2   # Go
 ```
 
 ## Quick Start
+
+Один сценарий для всех языков: source `/test.gif` → сегмент `200x200` → формат `webp` → dpr `2` → canonical URL.
 
 ### Python
 
@@ -113,16 +112,6 @@ const imager = new Imager({ baseURL: "https://imgs.example.com/images/", format:
 const asset = imager.GetAsset("/test.gif", { width: 200, height: 200 }, "gif", 2);
 const url = imager.GetAssetPath("/test.gif", "200x200", "webp");
 // https://imgs.example.com/images/test-gif/200x200.webp
-
-// Сервер (Node) — только здесь доступны админ-методы
-import { ImagerServer } from "imager-client/server";
-
-const server = new ImagerServer({
-    baseURL: "https://imgs.example.com/images/",
-    token: "secret",
-    adminURL: "https://imager.example.com",
-});
-await server.AdminGenerate("/test.gif", true);
 ```
 
 ### Go
@@ -140,81 +129,7 @@ url := i.GetAssetPath("/test.gif", "200x200", "webp")
 // https://imgs.example.com/images/test-gif/200x200.webp
 ```
 
-## Параметры методов
-
-| Метод | Сигнатура | Результат |
-|---|---|---|
-| `GetAsset` | `(source, segment?, format?, dpr?)` | один `AssetType` |
-| `GetAssets` | `(source, segments?, formats?, dprs?)` | `AssetType[]` — по одному на формат (ассеты с одинаковым типом объединяются) |
-| `GetAssetsHtml` | `(source, segments?, formats?, dprs?, options?)` | `string` — HTML `<picture>`/`<img>` |
-| `GetAssetPath` | `(source, segment?, format?, dpr?)` | `string` — URL основного варианта |
-| `AdminGenerate` | `(target, wait?)` | `bool` — HTTP 200/202 (в TS — только `ImagerServer`) |
-| `AdminDelete` | `(target, wait?)` | `bool` — HTTP 200 (в TS — только `ImagerServer`) |
-
-### segment — четыре формы записи
-
-```text
-"thumb"                       # строка как есть: именованный пресет
-"200x200" | "200x" | "x200"   # строка-размер
-{"width": 200, "height": 200} # объект; оба поля необязательны
-[200, 200]                    # массив [width, height]; оба обязательны
-— не задан                    # → "x"
-```
-
-### format / formats — строка или список
-
-```text
-"webp"                    # один формат
-["webp", "gif"]           # список (для GetAssets)
-"auto" | ""               # формат исходника; если исходник не картинка — "jpg"
-— не задан                # → настройки imager (format / formats) → формат исходника
-```
-
-Список дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются
-(первое вхождение сохраняет позицию). Поддерживаемые форматы картинок:
-`jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif` — всё остальное
-(видео, отсутствие расширения) считается не-картинкой, поэтому
-`auto`/`""` резолвится в `jpg`.
-
-```text
-GetAssets("/test.jpg", "100x100", ["webp", "avif", "jpg", "webp", "auto"])  # → webp, avif, jpg
-GetAssets("/test.jpg", "100x100", ["webp", "auto"])                         # → webp, jpg
-GetAssets("/test.jpg", "100x100", ["jpg", "auto"])                          # → jpg
-GetAssets("/test.mov", "100x100", ["jpg", "auto"])                          # → jpg
-GetAssets("/test.jpg", "100x100", ["webp", "jpg", "auto"])                  # → webp, jpg
-```
-
-### dpr — число или строка
-
-```text
-2        # варианты без суффикса и @2
-"3"      # строка-цифра: без суффикса, @2, @3
-1        # один вариант без поля dpr (1x — дефолтный дескриптор)
-0        # dpr не используется
-> 3      # трактуется как 3
-— не задан # → настройки imager (dpr)
-```
-
-### srcset — w-режим (sizes) / x-режим (dpr)
-
-```text
-sizes: "..."   # w-режим: w-дескрипторы (200w, 400w); 'x'-пути (оригинальный размер)
-               # в srcset не попадают — оригинал остаётся только в src у <img> как fallback
-— без sizes    # x-режим: x-дескрипторы (1x, 2x, 3x); 'x'-пути — эвристика max+1:
-               # max_dpr вычисляется ТОЛЬКО из размерных путей (width/height);
-               # dpr-поля 'x'-путей в расчёт не участвуют.
-               # Если размерные пути есть — дескриптор = (max_dpr + 1) × dpr-шаг
-               # (приблизительный, т.к. реальный размер оригинала неизвестен);
-               # если размерных путей нет, но есть dpr-шаги (dprs ≥ 2) —
-               # дескриптор = dpr-шаг (1x, 2x, 3x...);
-               # если нет ни размерных путей, ни dpr-шагов (dprs = 0) —
-               # путь в srcset без дескриптора (просто путь, без 1x).
-```
-
-- `<source>` всегда содержит `srcset` (никогда `src`), даже при одном пути в группе; при пустом srcset `<source>` не выводится.
-- `<img>`: `srcset` добавляется только если путей > 1 **и** srcset не пуст; иначе у `<img>` только `src`.
-
-### Примеры разных вариантов вызова
+## Common use cases
 
 ```python
 imager.GetAsset("/test.gif")                       # минимальный: сегмент "x", формат исходника
@@ -225,19 +140,85 @@ imager.GetAsset("/test.gif", "200x200", "webp")    # + формат
 imager.GetAsset("/test.gif", "200x200", "webp", 2) # + dpr (варианты без суффикса и @2)
 
 imager.GetAssets("/test.gif", ["200x200", "x400"], ["webp", "gif"], "2")  # 2 ассета (по одному на формат)
+imager.GetAssetsHtml("/test.gif", "200x200", ["webp", "jpg"], 2)          # готовый <picture>
+```
+
+Admin-методы (только server-side):
+
+```python
 imager.AdminGenerate("/test.gif", True)                   # по source
 imager.AdminGenerate(asset)                               # по AssetType
 imager.AdminDelete(["/path/a.webp", "/path/b.webp"])      # список готовых путей
 ```
 
-Полное описание всех вариантов, структуры `AssetType`, MIME-таблица и правила формирования URL — в языковых доках: [Python](./doc/PY-RU.md), [PHP](./doc/PHP-RU.md), [TypeScript](./doc/TS-RU.md), [Go](./doc/GO-RU.md).
+## Client vs Server-side usage
 
-## Тесты
+Клиентские методы — чистые функции, безопасны в любом окружении. Admin-методы требуют токен и доступ к admin API, поэтому:
 
-Единые golden-кейсы в [`test/fixture.json`](test/fixture.json): все 4 языка дают **побайтово идентичный** JSON-результат для каждого кейса. Нормализация props фреймворк-компонентов — в [`test/fixture-components.json`](test/fixture-components.json).
+- **Python, PHP, Go** — все методы в одном классе; используйте admin-методы только на бэкенде, не раскрывайте токен во фронтенд-коде.
+- **TypeScript** — разделение на уровне импортов:
+  - `imager-client` — браузер/клиент: `GetAsset`, `GetAssets`, `GetAssetPath`, `GetAssetsHtml`. Без token/adminURL.
+  - `imager-client/server` — Node.js: `ImagerServer` расширяет `Imager` методами `AdminGenerate`, `AdminDelete` (async, fetch).
+
+```ts
+import { ImagerServer } from "imager-client/server";
+
+const server = new ImagerServer({
+    baseURL: "https://imgs.example.com/images/",
+    token: "secret",
+    adminURL: "https://imager.example.com",
+});
+await server.AdminGenerate("/test.gif", true);
+```
+
+## Documentation
+
+| Документ | Описание |
+|---|---|
+| [README-EN](./doc/README-EN.md) | Английская версия этого файла |
+| [PY-RU](./doc/PY-RU.md) / [PY-EN](./doc/PY-EN.md) | Python: полный API, AssetType, MIME-таблица |
+| [PHP-RU](./doc/PHP-RU.md) / [PHP-EN](./doc/PHP-EN.md) | PHP: полный API, AssetType, MIME-таблица |
+| [TS-RU](./doc/TS-RU.md) / [TS-EN](./doc/TS-EN.md) | TypeScript: клиент + сервер, browser/server разделение |
+| [GO-RU](./doc/GO-RU.md) / [GO-EN](./doc/GO-EN.md) | Go: полный API, AssetType, MIME-таблица |
+| [React README](./packages/react/README.md) | React-компоненты, SSR/hydration |
+| [Vue README](./packages/vue/README.md) | Vue-компоненты, SSR/hydration |
+| [Twig README](./packages/twig/README.md) | Twig-функции |
+
+## Packages
+
+| Registry | Пакеты |
+|---|---|
+| [PyPI](https://pypi.org/project/imager_client/) | `imager_client` |
+| [Packagist](https://packagist.org/packages/pkg-ru/imager-client) | `pkg-ru/imager-client`, [`pkg-ru/imager-twig`](https://packagist.org/packages/pkg-ru/imager-twig) |
+| [npm](https://www.npmjs.com/package/imager-client) | `imager-client`, [`@pkg-ru/imager-react`](https://www.npmjs.com/package/@pkg-ru/imager-react), [`@pkg-ru/imager-vue`](https://www.npmjs.com/package/@pkg-ru/imager-vue) |
+| [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2) | `gitverse.ru/pkg-ru/imager-client/v2` |
+
+## Compatibility
+
+| Язык | Версия | Runtime |
+|---|---|---|
+| Python | 2.0.5 | Python 3 |
+| PHP | 2.x | PHP ≥ 8.1, ext-curl |
+| TypeScript | 2.0.5 | Node 18+ (для server), современные браузеры |
+| Go | 2.0.5 | Go ≥ 1.23.7 |
+
+Все реализации v2 используют единый формат URL и проходят одни и те же golden-тесты. Изменения формата URL между мажорными версиями — breaking changes; см. changelog в репозитории.
+
+## Limitations
+
+- Клиент не генерирует изображения — для этого нужен запущенный [Imager Service](https://gitverse.ru/pkg-ru/imager).
+- Admin-методы недоступны в браузерном импорте `imager-client` (только `imager-client/server`).
+- Python `GetAssetsHtml` может бросить `IndexError` при пустом результате.
+- PHP требует расширение `ext-curl`.
+- Поддерживаемые форматы: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Всё остальное (видео, отсутствие расширения) считается не-картинкой: `auto`/`""` резолвится в `jpg`.
+- DPR ограничен диапазоном 1..3; при dpr ≥ 2 генерируются шаги 1..dpr с суффиксами `@2`/`@3`.
+
+## Testing
+
+Единые golden-кейсы: [`test/fixture.json`](test/fixture.json) (82 кейса) — все 4 языка дают структурно идентичный результат для каждого кейса. Нормализация props фреймворк-компонентов — [`test/fixture-components.json`](test/fixture-components.json) (12 кейсов).
 
 ```bash
-make test
+make test   # Go + TS + PHP + Python (golden-прогон)
 ```
 
 или по языкам:
@@ -255,4 +236,27 @@ go run test/test.go
 make test-react test-vue test-twig
 ```
 
-© 2025 [Алтухов Владислав Владимирович](https://altuh.ru/about)
+## Development
+
+```bash
+npm run build        # сборка TS-ядра
+npm run lint         # линтинг
+make build-react     # сборка react-пакета (включая ядро)
+make build-vue       # сборка vue-пакета (включая ядро)
+```
+
+Версии пакетов синхронизируются скриптом [`scripts/sync_version.py`](scripts/sync_version.py).
+
+## Project ecosystem
+
+- [Imager Service](https://gitverse.ru/pkg-ru/imager) — микросервис генерации изображений
+- [Imager Client](https://gitverse.ru/pkg-ru/imager-client) — этот репозиторий (зеркало: [GitHub](https://github.com/pkg-ru/imager-client))
+- [Демо](https://altuh.ru/demo/imager) — пример работы микросервиса и клиентской части
+
+## License
+
+[GPL-3.0](./LICENSE)
+
+## Author
+
+[Алтухов Владислав Владимирович](https://altuh.ru/about)

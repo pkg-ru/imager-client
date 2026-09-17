@@ -1,96 +1,155 @@
-# @pkg-ru/imager-vue
+# Vue integration for Imager Client
 
-Vue 3-компоненты для микросервиса [Imager](https://gitverse.ru/pkg-ru/imager).
+Vue 3-компоненты [`@pkg-ru/imager-vue`](https://www.npmjs.com/package/@pkg-ru/imager-vue) для микросервиса [Imager Service](https://gitverse.ru/pkg-ru/imager): рендер `<picture>`/`<img>` с адаптивными `srcset` на основе ядра [Imager Client](https://gitverse.ru/pkg-ru/imager-client).
 
-> **Пакет:** [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue) · **Репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) / [GitHub](https://github.com/pkg-ru/imager-client) · **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager)
+> [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue) · [Imager Service](https://gitverse.ru/pkg-ru/imager) · [Imager Client](https://gitverse.ru/pkg-ru/imager-client) · [Demo](https://altuh.ru/demo/imager)
 
-Тонкие обёртки над ядром [`imager-client`](https://www.npmjs.com/package/imager-client): вся логика
-(сегменты, dpr, форматы, srcset) — в ядре, компоненты нормализуют алиасы
-props и рендерят нативные vnode.
+## Overview
 
-Пакет **самодостаточен**: ядро встроено в бандл, отдельная установка `imager-client` не требуется.
+Пакет — тонкие обёртки над ядром `imager-client`: вся логика (сегменты, dpr, форматы, `srcset`) находится в ядре, компоненты нормализуют алиасы props и рендерят нативные Vue-ноды через `h()`.
 
+Пакет самодостаточен: ядро встроено в бандл, отдельная установка `imager-client` не требуется. Ядро также реэкспортируется из пакета: `Imager`, `ImagerOptions`, `AssetPath`, `AssetType`, `Segment`, `mimeFor`, `normalizeProps`, `buildSrcset`, `groupAssets`, `pickImgGroup`, `splitAttrs`, `useWidthDescriptors`, `IMG_ATTRS`, `HtmlGroup`, `fmtDescriptor`, `ImagerComponentProps`, `NormalizedCall`.
 
-
-## Установка
+## Installation
 
 ```bash
 npm install @pkg-ru/imager-vue
 ```
 
-> `imager-client` — **опциональный** peerDependency. Он нужен только если в коде
-> используется свой инстанс ядра (например, `ImagerServer` с админ-методами или другая версия ядра).
-> В этом случае установите его отдельно и передайте инстанс в `ImagerProvider`:
+`imager-client` нужен только если используется свой инстанс ядра (например, `ImagerServer` с админ-методами или другая версия ядра). В этом случае установите его отдельно и передайте инстанс в `ImagerProvider`:
 
-> ```bash
-> npm install imager-client @pkg-ru/imager-vue
-> ```
+```bash
+npm install imager-client @pkg-ru/imager-vue
+```
 
-## Инициализация по умолчанию
-
-### Через `ImagerPlugin` (глобально, `app.use()``
+## Quick Start
 
 ```ts
 // main.ts
 import { createApp } from "vue";
 import { ImagerPlugin } from "@pkg-ru/imager-vue";
+import App from "./App.vue";
 
 createApp(App)
     .use(ImagerPlugin, { baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true })
     .mount("#app");
 ```
 
-После этого компоненты работают **без** `ImagerProvider`:
-
 ```vue
+<!-- App.vue -->
 <template>
     <ImagerAssets src="/test.png" width="200" height="200" dpr="2" format="webp" alt="Фото" />
-    <ImagerAsset source="/test.png" preset="thumb" format="webp" />
 </template>
 ```
 
+## Initialization
 
+### Через `ImagerPlugin` (глобально, `app.use()`)
 
-### Через компонент-провайдер
+`ImagerPlugin.install(app, options)` создаёт `Imager` из options и регистрирует его через `app.provide` (ключ — `imagerKey`). После этого компоненты работают без `ImagerProvider`.
+
+```ts
+// main.ts
+createApp(App)
+    .use(ImagerPlugin, { baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true })
+    .mount("#app");
+```
+
+### Через `ImagerProvider` (локально)
+
+`ImagerProvider` — компонент-провайдер. Принимает **только** prop `imager` (готовый инстанс, обязательный). Передать options нельзя — в отличие от React-версии, инстанс нужно создать самостоятельно. Провайдер приоритетнее глобального `ImagerPlugin`.
 
 ```vue
 <script setup lang="ts">
-import { Imager } from "@pkg-ru/imager-vue";   // или из "imager-client"
-import { ImagerProvider, ImagerAssets, ImagerAsset } from "@pkg-ru/imager-vue";
+import { Imager, ImagerProvider, ImagerAssets } from "@pkg-ru/imager-vue";
 
 const imager = new Imager({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true });
 </script>
 
 <template>
     <ImagerProvider :imager="imager">
-        <ImagerAssets src="/test.png" width="200" height="200" dpr="2" format="webp" alt="Фото" />
-        <ImagerAsset source="/test.png" preset="thumb" format="webp" />
+        <ImagerAssets src="/test.png" width="200" height="200" alt="Фото" />
     </ImagerProvider>
 </template>
 ```
 
-`ImagerProvider` (контекст) приоритетнее глобального `ImagerPlugin`.
+### Напрямую через `imagerKey` / `useInjectImager`
 
-
-
-## SSR / prerender + hydration
-
-Плагин **не является `.client`-only**: инстанс `Imager` нужен и на сервере
-(SSR/prerender формируют `<picture>` с `<source>` в HTML), и на клиенте
-(ts/vue/react — hydration). Компоненты рендерят **нативные Vue-ноды** (`h()`),
-а ядро — чистые функции без DOM/`window`, поэтому один и тот же код даёт
-**идентичный HTML** на сервере и на клиенте.
-
-### Nuxt 3
+`imagerKey` — `InjectionKey<Imager>` для `provide`/`inject`; `useInjectImager()` возвращает инстанс из контекста или `null`.
 
 ```ts
-// nuxt.config.ts
-export default defineNuxtConfig({
-    modules: ["@pkg-ru/imager-vue/nuxt"], // или свой модуль с ImagerPlugin
-});
+import { imagerKey, useInjectImager } from "@pkg-ru/imager-vue";
+
+// provide вручную (альтернатива ImagerPlugin)
+app.provide(imagerKey, new Imager({ baseURL: "https://imgs.example.com/images/" }));
+
+// inject в composable
+const imager = useInjectImager();
 ```
 
-Либо инициализация вручную в `app.vue` / `nuxt.config.ts`:
+Также каждый компонент принимает собственный prop `imager` — он приоритетнее контекста:
+
+```vue
+<ImagerAssets :imager="imager" src="/test.png" width="200" height="200" alt="Фото" />
+```
+
+## Components / Functions
+
+| Экспорт | Назначение |
+|---|---|
+| `ImagerPlugin` | `app.use(ImagerPlugin, options)`: создаёт `Imager` и `provide` его |
+| `imagerKey` | `InjectionKey<Imager>` для `provide`/`inject` |
+| `useInjectImager()` | composable: возвращает `Imager` из контекста или `null` |
+| `ImagerProvider` | компонент-провайдер, prop `imager` (обязательный) |
+| `ImagerAssets` | `<picture>` + `<source>` + `<img>` из `GetAssets()`; при одном формате — только `<img>` |
+| `ImagerAsset` | один `<img>` из `GetAsset()` |
+
+Если инстанс не найден (нет провайдера/плагина и prop `imager`) или ядро вернуло пустой результат — компонент возвращает `null`.
+
+## Props
+
+Компоненты `ImagerAssets` и `ImagerAsset` принимают `ImagerComponentProps` (см. ядро) плюс `imager`:
+
+| Prop | Тип | Назначение |
+|---|---|---|
+| `source` / `src` | `string` | путь к исходнику; `src` — алиас `source` |
+| `segment` | `Segment` | канонический сегмент; приоритет: `segment` > `preset` > `width`/`height` |
+| `preset` | `string` | алиас `segment` (именованный пресет) |
+| `width` / `height` | `number \| string` | алиас `segment` (размерный сегмент) |
+| `formats` | `string \| string[]` | список форматов; принимает и строку с запятыми: `formats="webp, avif"`; `format` — алиас |
+| `dprs` | `number \| string` | коэффициент(ы) плотности; `dpr` — алиас |
+| `imager` | `Imager` | инстанс ядра (приоритетнее контекста) |
+| `imgAttrs` | `Record<string, unknown>` | атрибуты именно на `<img>` (приоритет над перенаправленными) |
+
+### Белый список HTML-атрибутов
+
+В options ядра (и далее в HTML) попадают **только** ключи из белого списка `HTML_ATTR_KEYS`:
+
+`alt`, `sizes`, `loading`, `lazy`, `decoding`, `fetchpriority`, `imgAttrs`, `class`, `id`, `style`
+
+Произвольные атрибуты (в том числе `data-*`) **не пробрасываются**. Распределение по элементам: `alt`, `sizes`, `loading`/`lazy`, `decoding`, `fetchpriority` → `<img>`; `class`, `id`, `style` → `<picture>`.
+
+```vue
+<ImagerAssets
+    src="/test.png"
+    class="wrap"
+    alt="Фото"
+    :img-attrs="{ class: 'img', decoding: 'async', fetchpriority: 'high', width: 333, height: 444 }"
+/>
+```
+
+```html
+<picture class="wrap">
+    <source type="image/webp" srcset="...">
+    <img src="..." srcset="..." alt="Фото" class="img" decoding="async" fetchpriority="high" width="333" height="444">
+</picture>
+```
+
+## SSR / Prerender / Hydration
+
+Плагин не является client-only: инстанс `Imager` нужен и на сервере (SSR/prerender формируют `<picture>` с `<source>` в HTML), и на клиенте (hydration). Компоненты рендерят нативные Vue-ноды (`h()`), а ядро — чистые функции без DOM/`window`, поэтому один и тот же код даёт идентичный HTML на сервере и на клиенте; повторная гидрация картинок не требуется.
+
+### Nuxt 3
 
 ```ts
 // plugins/imager.ts — выполняется и на сервере (SSR), и на клиенте (hydration)
@@ -115,80 +174,65 @@ export default defineNuxtPlugin((nuxtApp) => {
 </template>
 ```
 
-`ImagerPlugin.install` регистрируется один раз: на сервере он выполняется в
-процессе SSR, на клиенте — при инициализации приложения. `ImagerProvider`
-с `:imager`/`options` работает аналогично в обоих окружениях.
+`ImagerPlugin.install` регистрируется один раз: на сервере он выполняется в процессе SSR, на клиенте — при инициализации приложения. `ImagerProvider` с `:imager` работает аналогично в обоих окружениях.
 
+## Responsive images
 
+`ImagerAssets` вызывает `GetAssets()` ядра: для каждого формата из `formats` и каждого коэффициента из `dprs` строится вариант URL, варианты группируются по MIME-типу (`groupAssets`), каждая группа становится `<source type="..." srcset="...">`, а группа основного формата — `<img>`. Дескрипторы `srcset` строятся по ширине или плотности в зависимости от `useWidthDescriptors(options)`. Если формат один — рендерится только `<img>` с `srcset`.
 
-## Re-export ядра
-
-Пакет re-export'ит ядро: `Imager`, `ImagerOptions`, `AssetPath`, `AssetType`, `Segment`,
-`mimeFor`, `normalizeProps`, `buildSrcset`, `groupAssets`, `pickImgGroup`, `splitAttrs`,
-`useWidthDescriptors`, `IMG_ATTRS`, `HtmlGroup` и др. — можно импортировать из пакета,
-не подключая `imager-client` отдельно.
-
-
-
-## Алиасы props
-
-| Алиас | Канонический | Пример |
-|---|---|---|
-| `src` | `source` | `<ImagerAssets src="/a.png" />` |
-| `preset` | `segment` | `<ImagerAssets preset="thumb" />` |
-| `width`/`height` | `segment` | `<ImagerAssets width="200" height="200" />` |
-| `format` | `formats` | `<ImagerAssets format="webp" />` |
-| `dpr` | `dprs` | `<ImagerAssets dpr="2" />` |
-
-Приоритет сегмента: `segment` > `preset` > `width`/`height`.
-
-`formats` принимает и строку с запятыми: `formats="webp, avif"`.
-
-Формат `"auto"` (или пустая строка) означает формат исходника; если исходник
-не картинка (видео, нет расширения) — подставляется `jpg`. Список `formats`
-дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются (первое
-вхождение сохраняет позицию). Поддерживаемые форматы картинок:
-`jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
+Формат `"auto"` (или пустая строка) означает формат исходника; если исходник не картинка (видео, нет расширения) — подставляется `jpg`. Список `formats` дедуплицируется: `jpeg` нормализуется к `jpg`, дубли удаляются (первое вхождение сохраняет позицию). Поддерживаемые форматы: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`.
 
 ```vue
 <ImagerAssets src="/test.jpg" width="100" height="100" formats="webp, avif, jpg, webp, auto" />
 <!-- → webp, avif, jpg (дубли удалены, auto → jpg) -->
 ```
 
-## Компоненты
+## Examples
 
-- `ImagerPlugin` — `app.use()`: создаёт `Imager` из options и `provide` его;
-- `ImagerProvider` — компонент-провайдер с `:imager`-пропом;
-- `ImagerAssets` — `<picture>` + `<source>` + `<img>` из `GetAssets()`;
-- `ImagerAsset` — один `<img>` из `GetAsset()`.
-
-
-
-HTML-атрибуты: `alt`, `sizes`, `loading`/`lazy`, `decoding`, `fetchpriority` → `<img>`;
-`class`, `id`, `style` → `<picture>`.
-
-`imgAttrs` — объект атрибутов, попадающих **именно на `<img>`** (приоритет над
-перенаправленными атрибутами):
+Именованный пресет и одиночный `<img>`:
 
 ```vue
-<ImagerAssets
-    src="/test.png"
-    class="wrap"
-    alt="Фото"
-    :img-attrs="{ class: 'img', decoding: 'async', fetchpriority: 'high', width: 333, height: 444 }"
-/>
+<ImagerAsset source="/test.png" preset="thumb" format="webp" />
 ```
 
-```html
-<picture class="wrap">
-    <source type="image/webp" srcset="...">
-    <img src="..." srcset="..." alt="Фото" class="img" decoding="async" fetchpriority="high" width="333" height="444">
-</picture>
+Ленивая загрузка и `sizes`:
+
+```vue
+<ImagerAssets src="/test.png" width="800" height="600" :formats="['webp', 'avif']" loading="lazy" sizes="(max-width: 600px) 100vw, 800px" alt="Фото" />
 ```
 
+Composable `useInjectImager` для прямого доступа к ядру:
 
+```vue
+<script setup lang="ts">
+import { useInjectImager } from "@pkg-ru/imager-vue";
 
-## Тесты
+const imager = useInjectImager();
+const path = imager?.GetAssetPath("/test.png", "thumb", "webp");
+</script>
+
+<template>
+    <img v-if="path" :src="path" alt="" />
+</template>
+```
+
+## Testing
 
 ```bash
 npm test   # из packages/vue
+```
+
+## Related
+
+- [Imager Service](https://gitverse.ru/pkg-ru/imager) — микросервис обработки изображений
+- [Imager Client](https://gitverse.ru/pkg-ru/imager-client) — ядро (клиенты для TS/PHP/Python/Go)
+- [Demo](https://altuh.ru/demo/imager) — демонстрация возможностей
+
+## License
+
+GPL-3.0
+
+## Author
+
+Алтухов Владислав Владимирович
+https://altuh.ru/about

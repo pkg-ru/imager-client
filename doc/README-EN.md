@@ -1,6 +1,6 @@
 # [Imager](https://gitverse.ru/pkg-ru/imager) Client
 
-Client library for the **Imager** microservice for four languages — Python, PHP, TypeScript and Go — with **identical behavior across all platforms**. Builds asset paths and URLs (previews, sizes, formats, retina) and calls admin generate/delete methods.
+Client library for the **Imager** microservice for four languages — Python, PHP, TypeScript and Go — with a **single API and structurally identical results across all platforms**. Builds canonical asset URLs (previews, sizes, formats, retina) and calls the admin API for generation/deletion.
 
 > Requires a configured and running [Imager microservice](https://gitverse.ru/pkg-ru/imager).
 
@@ -22,11 +22,11 @@ Client library for the **Imager** microservice for four languages — Python, PH
 
 ## Why Imager Client
 
-- **One API — four languages.** All implementations produce **byte-identical** JSON results on a shared golden test suite: build URLs on the backend (PHP, Python, Go, Node) and on the frontend (TS) with no discrepancies.
-- **Zero-dependency.** Not a single external package: only the standard library of each language (urllib, curl, fetch, net/http).
-- **Instant.** Client methods are pure string-concatenation functions: no HTTP, no validation, no exceptions. Generating a million assets is nearly instant.
-- **Safe secrets.** In TypeScript, admin methods live in a separate server import `imager-client/server`: the token physically cannot end up in the browser bundle.
+- **One API — four languages.** All implementations pass a shared golden test suite and produce **structurally identical** results (comparison ignoring key order).
+- **No third-party runtime libraries.** The client core uses only the standard library of each language (urllib, curl, fetch, net/http). Exception: PHP requires the `ext-curl` extension.
 - **Flexible parameters.** Pass a size segment as a string, object or array; dpr as a number or string; format as one value or a list. The `sort: true` option sorts size segments in `GetAssets` by `width`/`height` (ascending; segments without `width` go last) **before** computing `dpr`, so all ratios are ≥ 1.
+- **Safe secrets.** In TypeScript, admin methods live in a separate server import `imager-client/server`: the token physically cannot end up in the browser bundle.
+- **HTML rendering.** `GetAssetsHtml` builds a ready `<picture>`/`<img>` with `srcset` (w- or x-mode).
 
 ## Installation
 
@@ -66,7 +66,7 @@ createApp(App).use(ImagerPlugin, { baseURL: "...", format: "webp", dpr: 2 }).mou
 ```
 
 ```twig
-{# Twig: extension with an imager service #}
+{# Twig: extension with an Imager Service #}
 {{ imager_assets('/test.png', {preset: 'thumb', format: 'webp', alt: 'Photo'})|raw }}
 ```
 
@@ -228,7 +228,7 @@ Full description of all variants, the `AssetType` structure, the MIME table and 
 
 ## Tests
 
-Unified golden cases in [`test/fixture.json`](../test/fixture.json): all 4 languages produce a **byte-identical** JSON result for each case. Prop normalization for framework components — in [`test/fixture-components.json`](../test/fixture-components.json).
+Unified golden cases in [`test/fixture.json`](../test/fixture.json) (82 cases): all 4 languages produce a **structurally identical** result for each case. Prop normalization for framework components — in [`test/fixture-components.json`](../test/fixture-components.json) (12 cases).
 
 ```bash
 make test
@@ -249,4 +249,36 @@ Framework packages:
 make test-react test-vue test-twig
 ```
 
-© 2025 [Altukhov Vladislav Vladimirovich](https://altuh.ru/about)
+## Limitations
+
+- The client does not generate images — a running [Imager Service](https://gitverse.ru/pkg-ru/imager) is required.
+- Admin methods are not available in the browser import `imager-client` (only `imager-client/server`).
+- Python `GetAssetsHtml` may raise `IndexError` on an empty result.
+- PHP requires the `ext-curl` extension.
+- Supported formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Everything else (video, missing extension) is treated as a non-image: `auto`/`""` resolves to `jpg`.
+- DPR is clamped to the range 1..3; at dpr ≥ 2 the steps 1..dpr are generated with `@2`/`@3` suffixes.
+
+## Development
+
+```bash
+npm run build        # TS core build
+npm run lint         # linting
+make build-react     # react package build (including the core)
+make build-vue       # vue package build (including the core)
+```
+
+Package versions are synchronized by the script [`scripts/sync_version.py`](../scripts/sync_version.py).
+
+## Project ecosystem
+
+- [Imager Service](https://gitverse.ru/pkg-ru/imager) — image generation microservice
+- [Imager Client](https://gitverse.ru/pkg-ru/imager-client) — this repository (mirror: [GitHub](https://github.com/pkg-ru/imager-client))
+- [Demo](https://altuh.ru/demo/imager) — example of the microservice and client part in action
+
+## License
+
+[GPL-3.0](../LICENSE)
+
+## Author
+
+[Vladislav Altukhov](https://altuh.ru/about)

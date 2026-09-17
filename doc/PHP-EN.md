@@ -21,7 +21,7 @@ Or in `composer.json`:
 ```json
 {
     "require": {
-        "pkg-ru/imager-client": "^1.0"
+        "pkg-ru/imager-client": "^2.0"
     }
 }
 ```
@@ -81,13 +81,10 @@ $imager = new Imager([
 ### GetAsset
 
 ```php
-public function GetAsset(
-    string $source,
-    Segment|array|string|null $segment = null,
-    ?string $format = null,
-    int|string|null $dpr = null
-): AssetType;
+public function GetAsset($source, $segment = null, $format = null, $dpr = null): AssetType;
 ```
+
+All parameters are `mixed` without type hints (cast inside the method: `(string)`, `(int)`, etc.). Return values are typed.
 
 Returns a **single** `AssetType`. `paths` contains all dpr variants from 1 to the final dpr.
 
@@ -101,13 +98,10 @@ Returns a **single** `AssetType`. `paths` contains all dpr variants from 1 to th
 ### GetAssets
 
 ```php
-public function GetAssets(
-    string $source,
-    mixed $segments = null,   // Segment | Segment[]
-    mixed $formats = null,    // string | string[]
-    int|string|null $dprs = null
-): array;                     // AssetType[]
+public function GetAssets($source, $segments = null, $formats = null, $dprs = null): array;  // AssetType[]
 ```
+
+All parameters are `mixed` without type hints.
 
 Returns a **list** of `AssetType` — one per format (all assets with the same type are merged into a single `AssetType`). Inside `paths` the order is **segment-major**: for each segment all dpr steps in a row. The `dpr` of each path is recalculated from actual sizes: the base is the width (or height) of the first participant with a known size, `dpr = actual width / base width`. `segments` not set → `["x"]`. `formats` not set → `formats` option → `[format]` → `[source format]`.
 
@@ -124,14 +118,10 @@ $imager->GetAssets("/test.jpg", "100x100", ["webp", "jpg", "auto"]);            
 ### GetAssetsHtml
 
 ```php
-public function GetAssetsHtml(
-    string $source,
-    mixed $segments = null,   // Segment | Segment[]
-    mixed $formats = null,    // string | string[]
-    int|string|null $dprs = null,
-    ?array $options = null    // HTML attributes
-): string;
+public function GetAssetsHtml($source, $segments = null, $formats = null, $dprs = null, $options = null): string;
 ```
+
+All parameters are `mixed` without type hints (`$options` — an array of HTML attributes).
 
 Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as `GetAssets` (assets are grouped by type). A single call generates exactly one `<picture>` tag (or `<img>` if there is only one format).
 
@@ -148,7 +138,7 @@ Returns a **string** — HTML markup `<picture>`/`<img>` for the same assets as 
 
 Rules:
 
-- Attributes are output in alphabetical order of names (deterministic output).
+- Attributes are output in insertion order (the order of keys in the `$options` array); no sorting is performed.
 - Boolean attributes (`lazy: true`, `loading: true`) — without a value; `false`/`null` — skipped.
 - Values are HTML-escaped (`&` → `&`, `<` → `<`, `>` → `>`, `"` → `"`, `'` → `&#x27;`).
 - Inside `<picture>` tags are divided by type (format): all paths of one format are merged into a single `srcset`.
@@ -182,29 +172,30 @@ $html = $imager->GetAssetsHtml(
 ### GetAssetPath
 
 ```php
-public function GetAssetPath(
-    string $source,
-    mixed $segment = null,
-    ?string $format = null,
-    int|string|null $dpr = null
-): string;
+public function GetAssetPath($source, $segment = null, $format = null, $dpr = null): string;
 ```
+
+All parameters are `mixed` without type hints.
 
 Returns a **string** — URL of the primary asset variant. Equivalent to `GetAsset(...)->paths[0]->path`.
 
 ### AdminGenerate
 
 ```php
-public function AdminGenerate(AssetType|AssetType[]|string[]|string $target, bool $wait = false): bool;
+public function AdminGenerate($target, bool $wait = false): bool;
 ```
+
+`$target` — `mixed` without a type hint (see the mapping below).
 
 `POST {adminURL}/admin/assets/generate`, header `Authorization: Bearer <token>`. Returns `true` on HTTP 200/202, otherwise `false`.
 
 ### AdminDelete
 
 ```php
-public function AdminDelete(AssetType|AssetType[]|string[]|string $target, bool $wait = false): bool;
+public function AdminDelete($target, bool $wait = false): bool;
 ```
+
+`$target` — `mixed` without a type hint (see the mapping below).
 
 `DELETE {adminURL}/admin/assets/delete` — same body and header. Returns `true` on HTTP 200, otherwise `false`.
 
@@ -221,7 +212,7 @@ public function AdminDelete(AssetType|AssetType[]|string[]|string $target, bool 
 - `AssetType` / `AssetType[]` — mode B: all `paths[].path` are collected into a single `assets` list.
 - `string[]` — mode B: the items are **already ready** asset paths, passed to `assets` **as-is**, without validation or transformations.
 
-If `token` or `adminURL` is empty — admin methods return `false` **without** an HTTP request. HTTP client — `curl_*` (`ext-curl` extension).
+If `token` or `adminURL` is empty — admin methods return `false` **without** an HTTP request. HTTP client — `curl_*` (`ext-curl` extension), timeout 10 seconds.
 
 ## Segment
 
@@ -262,7 +253,7 @@ If `token` or `adminURL` is empty — admin methods return `false` **without** a
 ```php
 final class AssetPath {
     public string $path = "";
-    public ?int $dpr = null;
+    public ?float $dpr = null;
     public ?int $width = null;
     public ?int $height = null;
 }
@@ -297,9 +288,19 @@ Path object field rules:
 - `path` — full URL, always present.
 - `dpr` — when dpr ≥ 2; `dpr: 1` — only if the group has a path with `dpr > 1` (otherwise 1x is the default descriptor, no field).
 - `width`/`height` — only for size segments (`200x200`, `{w,h}`, `[w,h]`, `x`, etc.); multiplied by dpr when dpr ≥ 2. Not added for named presets.
-- `type` — MIME of the output format; video (`mp4`, `webm`, `mov`, `mkv`, `avi`, `m4v`) and unknown format → `""`.
+- `type` — MIME of the output format: always `"image/" + format` (for `jpg` — `image/jpeg`). An empty string is impossible: `mime_for` is defined for any format.
 - `source_format` — `true` when the output format matches the source file format; present in JSON only when `true`.
 - `all_support` — `true` when the output format ∈ {`jpg`, `jpeg`, `gif`, `png`} (supported by all browsers); present in JSON only when `true`.
+
+### Global format functions
+
+The [`ImagerTypes.php`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-php/ImagerTypes.php) file (namespace `imagerClient\`, loaded via `autoload.files`) defines:
+
+- `IMAGE_FORMATS` — a constant array of supported image formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Anything not in the list (video, etc.) is treated as a non-image when `format="auto"/""`.
+- `normalize_format(string $format): string` — normalization: lower-case, `jpeg` → `jpg`.
+- `resolve_format(string $format, string $source_format): string` — resolves a single format: `"auto"`/`""` → the source format if it is an image, otherwise `jpg`.
+- `dedupe_formats(array $formats): array` — deduplication of the format list (`jpeg` → `jpg`, the first occurrence keeps its position).
+- `mime_for(string $format): string` — MIME by output format: always `"image/" + format` (for `jpg` — `image/jpeg`).
 
 ### MIME by format
 
