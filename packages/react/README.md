@@ -36,7 +36,7 @@ npm install @pkg-ru/imager-react
 import { ImagerPlugin, ImagerAssets, ImagerAsset } from "@pkg-ru/imager-react";
 
 // main.tsx — один раз при старте приложения
-ImagerPlugin.install({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2 });
+ImagerPlugin.install({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true });
 
 export function App() {
     return (
@@ -61,7 +61,7 @@ import { ImagerProvider, ImagerAssets, ImagerAsset } from "@pkg-ru/imager-react"
 
 export function App() {
     return (
-        <ImagerProvider options={{ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2 }}>
+        <ImagerProvider options={{ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true }}>
             <ImagerAssets src="/test.png" width={200} height={200} dpr={2} format="webp" alt="Фото" />
             <ImagerAsset source="/test.png" preset="thumb" format="webp" />
         </ImagerProvider>
@@ -75,7 +75,7 @@ export function App() {
 import { Imager } from "@pkg-ru/imager-react";   // или из "imager-client"
 import { ImagerProvider, ImagerAssets, ImagerAsset } from "@pkg-ru/imager-react";
 
-const imager = new Imager({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2 });
+const imager = new Imager({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true });
 
 export function App() {
     return (

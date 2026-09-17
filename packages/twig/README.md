@@ -27,6 +27,7 @@ $twig->addExtension(new ImagerTwigExtension([
     'baseURL' => 'https://imgs.example.com/images/',
     'format'  => 'webp',
     'dpr'     => 2,
+    'sort'    => true,
 ]));
 
 // 2) Или передайте готовый Imager-инстанс
@@ -34,6 +35,11 @@ $twig->addExtension(new ImagerTwigExtension(new Imager([
     'baseURL' => 'https://imgs.example.com/images/',
 ])));
 ```
+
+Опции передаются в ядро `Imager` без изменений. `sort: true` сортирует
+размерные сегменты в `imager_assets`/`imager_assets_raw` по `width`/`height`
+(по возрастанию; сегменты без `width` — в конец) **до** вычисления `dpr`,
+поэтому все коэффициенты ≥ 1. По умолчанию `false`.
 
 ## Функции
 

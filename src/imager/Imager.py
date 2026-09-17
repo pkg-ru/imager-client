@@ -30,7 +30,8 @@ class Imager:
         format   — формат генерации по умолчанию ("");
         formats  — список форматов по умолчанию ([] → используется `format`);
         baseURL  — база URL ассетов, нормализована (всегда с `/` на конце);
-        adminURL — база админ-API (без завершающего `/`).
+        adminURL — база админ-API (без завершающего `/`);
+        sort     — сортировать размерные сегменты по width/height (False).
     """
 
     __slots__ = (
@@ -40,6 +41,7 @@ class Imager:
         "_formats",
         "_baseURL",
         "_adminURL",
+        "_sort",
         "_src_cache",
     )
 
@@ -79,6 +81,9 @@ class Imager:
         else:
             admin_url = str(admin_url)
             self._adminURL = admin_url.rstrip("/") if admin_url.endswith("/") else admin_url
+
+        sort = options.get("sort")
+        self._sort = bool(sort) if sort is not None else False
 
         # (source, path, source_name, source_format, prefix)
         self._src_cache = None
@@ -161,6 +166,31 @@ class Imager:
             return Imager._build_size(width, height), True, width, height
 
         return "x", True, 0, 0
+
+    @staticmethod
+    def _sort_segments(seg_data: list) -> list:
+        """Сортирует нормализованные сегменты по width/height (стабильно).
+
+        Правила:
+        - сегменты с width > 0 — по возрастанию width, при равенстве — по height;
+        - height = 0/отсутствует — в конец своей width-группы;
+        - сегменты без width (x400, thumb) — в самый конец, между собой
+          не сортируются (сохраняют исходный порядок);
+        - если ни у одного сегмента нет ни width, ни height — не сортируем.
+        """
+        has_size = any(width > 0 or height > 0 for _, _, width, height in seg_data)
+        if not has_size:
+            return seg_data
+
+        with_width = []
+        without_width = []
+        for item in seg_data:
+            (with_width if item[2] > 0 else without_width).append(item)
+
+        with_width.sort(
+            key=lambda item: (item[2], item[3] if item[3] > 0 else 1 << 62)
+        )
+        return with_width + without_width
 
     @staticmethod
     def _segment_to_string(segment: Optional[Any]) -> str:
@@ -391,6 +421,8 @@ class Imager:
             raw_segments = (segments,)
 
         seg_data = [self._normalize_segment(seg) for seg in raw_segments]
+        if self._sort:
+            seg_data = self._sort_segments(seg_data)
         fmt_list = self._format_input_formats(
             formats, source_format, self._format, self._formats
         )

@@ -57,6 +57,7 @@ export class Imager {
     protected _format: string;
     protected _formats: string[];
     protected _baseURL: string;
+    protected _sort: boolean;
 
     // одноэлементный кэш последнего source: (source, prefix, sourceFormat)
     protected _lastSource: unknown = null;
@@ -100,6 +101,11 @@ export class Imager {
                 : base.endsWith("/")
                   ? base
                   : base + "/";
+
+        this._sort =
+            o.sort === null || o.sort === undefined
+                ? false
+                : Boolean(o.sort);
     }
 
     private static _toInt(value: unknown): number {
@@ -434,6 +440,83 @@ export class Imager {
         return ctx;
     }
 
+    /** Сортирует сегменты по width/height (стабильно).
+
+    Правила:
+    - сегменты с width > 0 — по возрастанию width, при равенстве — по height;
+    - height = 0/отсутствует — в конец своей width-группы;
+    - сегменты без width (x400, thumb) — в самый конец, между собой
+      не сортируются (сохраняют исходный порядок);
+    - если ни у одного сегмента нет ни width, ни height — не сортируем.
+    */
+    private _sortSegments(segList: SegmentValue[]): SegmentValue[] {
+        interface ParsedSeg {
+            seg: SegmentValue;
+            width: number;
+            height: number;
+        }
+
+        const parsed = new Array<ParsedSeg>(segList.length);
+
+        let hasSize = false;
+
+        for (let i = 0; i < segList.length; i++) {
+            const ctx = this._parseSegment(segList[i]);
+
+            parsed[i] = {
+                seg: segList[i],
+                width: ctx.width,
+                height: ctx.height,
+            };
+
+            if (ctx.width > 0 || ctx.height > 0) {
+                hasSize = true;
+            }
+        }
+
+        if (!hasSize) {
+            return segList;
+        }
+
+        const withWidth: ParsedSeg[] = [];
+        const withoutWidth: ParsedSeg[] = [];
+
+        for (let i = 0; i < parsed.length; i++) {
+            if (parsed[i].width > 0) {
+                withWidth.push(parsed[i]);
+            } else {
+                withoutWidth.push(parsed[i]);
+            }
+        }
+
+        withWidth.sort((a, b) => {
+            if (a.width !== b.width) {
+                return a.width < b.width ? -1 : 1;
+            }
+
+            const ah = a.height > 0 ? a.height : Number.MAX_SAFE_INTEGER;
+            const bh = b.height > 0 ? b.height : Number.MAX_SAFE_INTEGER;
+
+            if (ah !== bh) {
+                return ah < bh ? -1 : 1;
+            }
+
+            return 0;
+        });
+
+        const result = new Array<SegmentValue>(parsed.length);
+        let pos = 0;
+
+        for (let i = 0; i < withWidth.length; i++) {
+            result[pos++] = withWidth[i].seg;
+        }
+        for (let i = 0; i < withoutWidth.length; i++) {
+            result[pos++] = withoutWidth[i].seg;
+        }
+
+        return result;
+    }
+
     protected _segmentString(
         segment: SegmentValue,
     ): string {
@@ -714,6 +797,10 @@ export class Imager {
             segList = [
                 segments as SegmentValue,
             ];
+        }
+
+        if (this._sort) {
+            segList = this._sortSegments(segList);
         }
 
         const segmentCount = segList.length;

@@ -26,7 +26,7 @@ Client library for the **Imager** microservice for four languages — Python, PH
 - **Zero-dependency.** Not a single external package: only the standard library of each language (urllib, curl, fetch, net/http).
 - **Instant.** Client methods are pure string-concatenation functions: no HTTP, no validation, no exceptions. Generating a million assets is nearly instant.
 - **Safe secrets.** In TypeScript, admin methods live in a separate server import `imager-client/server`: the token physically cannot end up in the browser bundle.
-- **Flexible parameters.** Pass a size segment as a string, object or array; dpr as a number or string; format as one value or a list.
+- **Flexible parameters.** Pass a size segment as a string, object or array; dpr as a number or string; format as one value or a list. The `sort: true` option sorts size segments in `GetAssets` by `width`/`height` (ascending; segments without `width` go last) **before** computing `dpr`, so all ratios are ≥ 1.
 
 ## Installation
 

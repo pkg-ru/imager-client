@@ -56,6 +56,19 @@ const imager = new Imager(options?: ImagerOptions | null);
 | `format` | `string` | `""` | default generation format (`""`/`"auto"` — source format; if the source is not an image — `jpg`) |
 | `formats` | `string[]` | `[]` | default format list; if empty — `format` is used; duplicates are removed (`jpeg` → `jpg`) |
 | `baseURL` | `string` | `"/"` | asset URL base; normalized (always trailing `/`) |
+| `sort` | `boolean` | `false` | sort size segments in `GetAssets` by `width`/`height` (see below) |
+
+### Segment sorting (`sort: true`)
+
+With `sort: true` the segments in `GetAssets` are sorted **before** building paths and computing `dpr`:
+
+1. Segments with `width > 0` — ascending by `width`; on equal `width` — ascending by `height`.
+2. `height = 0`/missing — to the end of its `width` group.
+3. Segments without `width` (`x400`, `thumb`) — to the very end, **not** sorted among themselves (keep the original order).
+4. If no segment has `width` or `height` — no sorting is performed.
+5. `dpr` is computed **after** sorting: the first (smallest) size segment defines `baseWidth`/`baseHeight`, so all ratios are ≥ 1.
+
+Example: `["300x", "100x100", "200x", "x400", "thumb"]` → `100x100 → 200x → 300x → x400 → thumb`.
 
 ### Server part
 

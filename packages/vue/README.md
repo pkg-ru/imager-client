@@ -36,7 +36,7 @@ import { createApp } from "vue";
 import { ImagerPlugin } from "@pkg-ru/imager-vue";
 
 createApp(App)
-    .use(ImagerPlugin, { baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2 })
+    .use(ImagerPlugin, { baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true })
     .mount("#app");
 ```
 
@@ -58,7 +58,7 @@ createApp(App)
 import { Imager } from "@pkg-ru/imager-vue";   // или из "imager-client"
 import { ImagerProvider, ImagerAssets, ImagerAsset } from "@pkg-ru/imager-vue";
 
-const imager = new Imager({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2 });
+const imager = new Imager({ baseURL: "https://imgs.example.com/images/", format: "webp", dpr: 2, sort: true });
 </script>
 
 <template>
@@ -102,6 +102,7 @@ export default defineNuxtPlugin((nuxtApp) => {
             baseURL: "https://imgs.example.com/images/",
             format: "webp",
             dpr: 2,
+            sort: true,
         });
     });
 });

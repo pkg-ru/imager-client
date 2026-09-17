@@ -80,6 +80,7 @@ class ImagerOptions(TypedDict, total=False):
     format: str
     formats: List[str]
     baseURL: str
+    sort: bool
 
 
 class ImagerServerOptions(ImagerOptions, total=False):

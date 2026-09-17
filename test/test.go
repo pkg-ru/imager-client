@@ -181,6 +181,7 @@ func BuildOptions(raw any) imagergo.Options {
 		Formats:  []string{},
 		BaseURL:  "",
 		AdminURL: "",
+		Sort:     false,
 	}
 	if raw == nil {
 		return o
@@ -204,6 +205,9 @@ func BuildOptions(raw any) imagergo.Options {
 	}
 	if m["adminURL"] != nil {
 		o.AdminURL = ToString(m["adminURL"])
+	}
+	if m["sort"] != nil {
+		o.Sort = m["sort"].(bool)
 	}
 	return o
 }

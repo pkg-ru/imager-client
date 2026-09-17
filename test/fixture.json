@@ -1623,5 +1623,154 @@
                 "all_support": true
             }
         ]
+    },
+    {
+        "id": 68,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "sort": true
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": [
+                "300x",
+                "100x100",
+                "200x",
+                "x400",
+                "thumb"
+            ],
+            "formats": [
+                "webp"
+            ],
+            "dprs": 0
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.webp",
+                        "dpr": 1,
+                        "width": 100,
+                        "height": 100
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/200x.webp",
+                        "dpr": 2,
+                        "width": 200
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/300x.webp",
+                        "dpr": 3,
+                        "width": 300
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/x400.webp",
+                        "dpr": 4,
+                        "height": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/thumb.webp"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": 69,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "sort": true
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": [
+                "300x",
+                "100x100",
+                "200x"
+            ],
+            "formats": [
+                "webp"
+            ],
+            "dprs": 2
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100.webp",
+                        "dpr": 1,
+                        "width": 100,
+                        "height": 100
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/100x100@2.webp",
+                        "dpr": 2,
+                        "width": 200,
+                        "height": 200
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/200x.webp",
+                        "dpr": 2,
+                        "width": 200
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/200x@2.webp",
+                        "dpr": 4,
+                        "width": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/300x.webp",
+                        "dpr": 3,
+                        "width": 300
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/300x@2.webp",
+                        "dpr": 6,
+                        "width": 600
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": 70,
+        "options": {
+            "baseURL": "https://imgs.example.com/images/",
+            "sort": true
+        },
+        "method": "GetAssets",
+        "args": {
+            "source": "/test.jpg",
+            "segments": [
+                "x400",
+                "thumb",
+                "200x"
+            ],
+            "formats": [
+                "webp"
+            ]
+        },
+        "expected": [
+            {
+                "type": "image/webp",
+                "paths": [
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/200x.webp",
+                        "width": 200
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/x400.webp",
+                        "height": 400
+                    },
+                    {
+                        "path": "https://imgs.example.com/images/test-jpg/thumb.webp"
+                    }
+                ]
+            }
+        ]
     }
 ]

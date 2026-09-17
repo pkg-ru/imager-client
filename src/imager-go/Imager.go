@@ -23,7 +23,8 @@ import (
 //   format   — формат генерации по умолчанию ("");
 //   formats  — список форматов по умолчанию ([] → используется `format`);
 //   baseURL  — база URL ассетов, нормализована (всегда с `/` на конце);
-//   adminURL — база админ-API (без завершающего `/`).
+//   adminURL — база админ-API (без завершающего `/`);
+//   sort     — сортировать размерные сегменты по width/height (false).
 
 // Сегмент-объект с необязательными размерами.
 // Публичный: принимается как `segment` в GetAsset/GetAssets/GetAssetPath.
@@ -39,6 +40,7 @@ type Imager struct {
 	Formats  []string
 	BaseURL  string
 	AdminURL string
+	Sort     bool
 }
 
 // Общий HTTP-клиент для админ-методов (один на все запросы, не per-request).
@@ -55,6 +57,7 @@ func New(options ...Options) *Imager {
 		Formats:  []string{},
 		BaseURL:  "/",
 		AdminURL: "",
+		Sort:     false,
 	}
 
 	if len(options) >= 1 {
@@ -87,6 +90,9 @@ func New(options ...Options) *Imager {
 		} else {
 			i.AdminURL = o.AdminURL
 		}
+
+		// sort
+		i.Sort = o.Sort
 	}
 
 	return i
@@ -320,6 +326,75 @@ func normalizeSegments(segments any) (int, []normalizedSegment) {
 	}
 }
 
+// sortSegments — сортирует нормализованные сегменты по width/height (стабильно).
+//
+// Правила:
+//   - сегменты с width > 0 — по возрастанию width, при равенстве — по height;
+//   - height = 0/отсутствует — в конец своей width-группы;
+//   - сегменты без width (x400, thumb) — в самый конец, между собой
+//     не сортируются (сохраняют исходный порядок);
+//   - если ни у одного сегмента нет ни width, ни height — не сортируем.
+func sortSegments(segs []normalizedSegment) []normalizedSegment {
+	hasSize := false
+	for n := range segs {
+		if segs[n].width > 0 || segs[n].height > 0 {
+			hasSize = true
+			break
+		}
+	}
+	if !hasSize {
+		return segs
+	}
+
+	withWidth := make([]normalizedSegment, 0, len(segs))
+	withoutWidth := make([]normalizedSegment, 0, len(segs))
+	for n := range segs {
+		if segs[n].width > 0 {
+			withWidth = append(withWidth, segs[n])
+		} else {
+			withoutWidth = append(withoutWidth, segs[n])
+		}
+	}
+
+	// Простая вставка: стабильная и без внешних зависимостей.
+	for i := 1; i < len(withWidth); i++ {
+		key := withWidth[i]
+		j := i - 1
+		for j >= 0 && compareSegments(withWidth[j], key) > 0 {
+			withWidth[j+1] = withWidth[j]
+			j--
+		}
+		withWidth[j+1] = key
+	}
+
+	return append(withWidth, withoutWidth...)
+}
+
+// compareSegments — компаратор: width, затем height (0 — в конец).
+func compareSegments(a, b normalizedSegment) int {
+	if a.width != b.width {
+		if a.width < b.width {
+			return -1
+		}
+		return 1
+	}
+	ah := a.height
+	if ah <= 0 {
+		ah = 1 << 62
+	}
+	bh := b.height
+	if bh <= 0 {
+		bh = 1 << 62
+	}
+	if ah != bh {
+		if ah < bh {
+			return -1
+		}
+		return 1
+	}
+	return 0
+}
+
 func formatsToList(formats any, defaults []string, defaultFormat, sourceFormat string) []string {
 	var list []string
 	switch t := formats.(type) {
@@ -422,8 +497,12 @@ func (i *Imager) GetAssets(source string, segments any, formats any, dprs any) [
 	fmtList := formatsToList(formats, i.Formats, i.Format, sourceFormat)
 	nFmt := len(fmtList)
 
-	// Нормализуем сегменты ровно один раз и сразу определяем базовые размеры.
+	// Нормализуем сегменты ровно один раз.
 	segCount, segs := normalizeSegments(segments)
+	if i.Sort {
+		segs = sortSegments(segs)
+		segCount = len(segs)
+	}
 	maxSteps := dprSteps(i.resolveDpr(dprs))
 
 	baseWidth, baseHeight := 0, 0

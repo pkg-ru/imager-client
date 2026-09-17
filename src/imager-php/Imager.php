@@ -13,6 +13,7 @@ final class Imager
     private array $formats = [];
     private string $baseURL = '/';
     private string $adminURL = '';
+    private bool $sort = false;
 
     private const IMG_ATTRS = [
         'alt' => true,
@@ -63,6 +64,9 @@ final class Imager
         if ($adminURL !== null && $adminURL !== '') {
             $this->adminURL = rtrim((string) $adminURL, '/');
         }
+
+        $sort = $options['sort'] ?? null;
+        $this->sort = $sort !== null ? (bool) $sort : false;
     }
 
     /** @return array{0:string,1:string,2:string} */
@@ -141,6 +145,77 @@ final class Imager
         }
 
         return ['x', true, 0, 0];
+    }
+
+    /**
+     * Сортирует нормализованные сегменты по width/height (стабильно).
+     *
+     * Правила:
+     * - сегменты с width > 0 — по возрастанию width, при равенстве — по height;
+     * - height = 0/отсутствует — в конец своей width-группы;
+     * - сегменты без width (x400, thumb) — в самый конец, между собой
+     *   не сортируются (сохраняют исходный порядок);
+     * - если ни у одного сегмента нет ни width, ни height — не сортируем.
+     *
+     * @param array $segments array{0:string,1:bool,2:int,3:int}[]
+     * @return array
+     */
+    private static function sortSegments(array $segments): array
+    {
+        $hasSize = false;
+        foreach ($segments as $seg) {
+            if ($seg[2] > 0 || $seg[3] > 0) {
+                $hasSize = true;
+                break;
+            }
+        }
+        if (!$hasSize) {
+            return $segments;
+        }
+
+        $withWidth = [];
+        $withoutWidth = [];
+        foreach ($segments as $seg) {
+            if ($seg[2] > 0) {
+                $withWidth[] = $seg;
+            } else {
+                $withoutWidth[] = $seg;
+            }
+        }
+
+        // Сортировка вставками: стабильная и без внешних зависимостей.
+        for ($i = 1; $i < count($withWidth); ++$i) {
+            $key = $withWidth[$i];
+            $j = $i - 1;
+            while ($j >= 0 && self::compareSegments($withWidth[$j], $key) > 0) {
+                $withWidth[$j + 1] = $withWidth[$j];
+                --$j;
+            }
+            $withWidth[$j + 1] = $key;
+        }
+
+        $result = [];
+        foreach ($withWidth as $seg) {
+            $result[] = $seg;
+        }
+        foreach ($withoutWidth as $seg) {
+            $result[] = $seg;
+        }
+        return $result;
+    }
+
+    /** Компаратор сегментов для usort: width, затем height (0 — в конец). */
+    private static function compareSegments(array $a, array $b): int
+    {
+        if ($a[2] !== $b[2]) {
+            return $a[2] < $b[2] ? -1 : 1;
+        }
+        $ah = $a[3] > 0 ? $a[3] : PHP_INT_MAX;
+        $bh = $b[3] > 0 ? $b[3] : PHP_INT_MAX;
+        if ($ah !== $bh) {
+            return $ah < $bh ? -1 : 1;
+        }
+        return 0;
     }
 
     private static function parseDpr($dpr): int
@@ -266,11 +341,16 @@ final class Imager
         $prefix = $path !== '' ? $this->baseURL . $path . '/' . $name . '/' : $this->baseURL . $name . '/';
 
         $normalizedSegments = [];
+        foreach ($segList as $seg) {
+            $normalizedSegments[] = self::normalizeSegment($seg);
+        }
+        if ($this->sort) {
+            $normalizedSegments = self::sortSegments($normalizedSegments);
+        }
+
         $baseWidth = 0;
         $baseHeight = 0;
-        foreach ($segList as $seg) {
-            $normalized = self::normalizeSegment($seg);
-            $normalizedSegments[] = $normalized;
+        foreach ($normalizedSegments as $normalized) {
             if ($baseWidth === 0 && $normalized[2] > 0) {
                 $baseWidth = $normalized[2];
             }

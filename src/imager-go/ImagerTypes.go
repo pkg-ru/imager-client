@@ -97,4 +97,5 @@ type Options struct {
 	Formats  []string
 	BaseURL  string
 	AdminURL string
+	Sort     bool
 }

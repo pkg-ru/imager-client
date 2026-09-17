@@ -32,6 +32,7 @@ export interface ImagerOptions {
     format?: string;
     formats?: string[];
     baseURL?: string;
+    sort?: boolean;
 }
 
 /** Настройки серверной части — добавляет token и adminURL. */
