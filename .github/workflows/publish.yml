@@ -50,13 +50,26 @@ jobs:
       image: gitverse.ru/pkg-ru/imager-ci:2026.09.2
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          # Клонируем ВСЕ ветки и теги, чтобы force-push тегов и манифестов
-          # работал корректно (аналогично mirror.yml).
-          fetch-all: true
+      # Ручная клонировка вместо actions/checkout@v4: в кастомном
+      # CI-образе gitverse.ru/pkg-ru/imager-ci checkout-действие не
+      # создаёт корректно .git (ошибка "fatal: not in a git directory").
+      # Клонируем ВСЕ ветки и теги, чтобы force-push тегов работал.
+      - name: Clone repository
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -e
+          TARGET="${GITHUB_WORKSPACE:-$PWD}"
+          rm -rf /tmp/repo
+          git clone --no-single-branch \
+            "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-client.git" \
+            /tmp/repo
+          # Добавляем .git в рабочую директорию, не трогая исходные файлы
+          rm -rf "${TARGET}/.git"
+          cp -r /tmp/repo/.git "${TARGET}/.git"
+          cd "$TARGET"
+          git fetch --all --tags
+          git checkout "${{ github.ref_name }}"
 
       # Дешёвая ранняя проверка окружения: быстро показывает проблемы
       # с CI-образом (неверная версия/отсутствующий toolchain).
@@ -71,17 +84,22 @@ jobs:
           go version
 
       - name: Install npm dependencies
-        run: npm ci
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          npm ci
 
       # Пакеты react/vue участвуют в golden-тестах (HTML-кейсы fixture.json)
       # и имеют собственные зависимости — устанавливаем их до прогона.
       - name: Install package dependencies (react/vue)
         run: |
+          cd "$GITHUB_WORKSPACE"
           cd packages/react && npm ci
           cd ../vue && npm ci
 
       - name: Build TypeScript
-        run: npm run build
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          npm run build
 
       # Единый golden-тест для всех языков: orquestратор go run test/test.go
       # запускает TS (npm test), PHP (php test/test.php), Python (python test/test.py),
@@ -90,24 +108,21 @@ jobs:
         run: go run test/test.go
 
       - name: Install PHP dependencies (twig for extension test)
-        run: composer install --no-interaction --no-progress --prefer-dist
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          composer install --no-interaction --no-progress --prefer-dist
 
       - name: Test Twig package
-        run: php packages/twig/test/test.php
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          php packages/twig/test/test.php
 
       # sync_version.py — ровно один раз за пайплайн и только после того,
       # как все тесты прошли успешно (шаг выше упал бы при любой ошибке)。
       - name: Sync version from tag
-        run: python scripts/sync_version.py "${{ github.ref_name }}"
-
-      # Диагностика: где мы и где .git, чтобы понять, почему git не находит репозиторий.
-      - name: Diagnose workspace
         run: |
-          echo "PWD=$PWD"
-          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE:-<unset>}"
-          ls -la "${GITHUB_WORKSPACE:-.}" 2>/dev/null | head -20
-          echo "--- searching for .git ---"
-          find "${GITHUB_WORKSPACE:-.}" -maxdepth 3 -name .git -type d 2>/dev/null
+          cd "$GITHUB_WORKSPACE"
+          python scripts/sync_version.py "${{ github.ref_name }}"
 
       # Коммитим синхронизированные манифесты в тег и force-push его,
       # чтобы версия фиксировалась в теге.
@@ -117,15 +132,7 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
-          # Найти корень git-репозитория (actions/checkout@v4 может класть код не в $GITHUB_WORKSPACE).
-          GIT_ROOT="${GITHUB_WORKSPACE:-$PWD}"
-          if [ ! -d "$GIT_ROOT/.git" ]; then
-            FOUND="$(find "${GIT_ROOT}" -maxdepth 3 -name .git -type d -print -quit 2>/dev/null)"
-            if [ -n "$FOUND" ]; then
-              GIT_ROOT="$(dirname "$FOUND")"
-            fi
-          fi
-          cd "$GIT_ROOT"
+          cd "$GITHUB_WORKSPACE"
           git config user.name "pkg-ru-bot"
           git config user.email "pkg-ru-bot@gitverse.ru"
           git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json packages/twig/composer.json
@@ -147,14 +154,7 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
-          GIT_ROOT="${GITHUB_WORKSPACE:-$PWD}"
-          if [ ! -d "$GIT_ROOT/.git" ]; then
-            FOUND="$(find "${GIT_ROOT}" -maxdepth 3 -name .git -type d -print -quit 2>/dev/null)"
-            if [ -n "$FOUND" ]; then
-              GIT_ROOT="$(dirname "$FOUND")"
-            fi
-          fi
-          cd "$GIT_ROOT"
+          cd "$GITHUB_WORKSPACE"
           if git push "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/heads/master" 2>/tmp/push-master.err; then
             echo "Версия ${TAG#v} запушена в master"
           else
@@ -220,14 +220,7 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
-          GIT_ROOT="${GITHUB_WORKSPACE:-$PWD}"
-          if [ ! -d "$GIT_ROOT/.git" ]; then
-            FOUND="$(find "${GIT_ROOT}" -maxdepth 3 -name .git -type d -print -quit 2>/dev/null)"
-            if [ -n "$FOUND" ]; then
-              GIT_ROOT="$(dirname "$FOUND")"
-            fi
-          fi
-          cd "$GIT_ROOT"
+          cd "$GITHUB_WORKSPACE"
           git push --force "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
           echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitVerse-зеркало"
 
