@@ -1,0 +1,61 @@
+name: Mirror to GitHub
+
+# Зеркалирование GitVerse (основной репозиторий) в GitHub (зеркало).
+# Все ветки и теги синхронизируются в github.com/pkg-ru/imager-client по GH_PAT.
+# Только в одну сторону: GitVerse → GitHub (обратной синхронизации нет).
+#
+# Публикация пакетов (npm, PyPI, Twig) выполняется в
+# .gitverse/workflows/publish.yml на GitVerse — там есть авторизация
+# для автопубликации. mirror.yml НИЧЕГО не публикует и не отправляет
+# dispatch: только синхронизирует refs.
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+
+jobs:
+  mirror:
+    name: Push refs to GitHub
+    runs-on: ubuntu-latest
+    steps:
+      # Зеркальный клон (все ветки + все теги одним действием),
+      # вместо actions/checkout: не зависим от поведения checkout-действия
+      # и получаем ровно те refs, которые нужно отправить.
+      - name: Clone GitVerse repository (mirror)
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+        run: |
+          set -e
+          if [ -z "${GITVERSE_PAT}" ]; then
+            echo "Секрет GITVERSE_PAT не задан" >&2
+            exit 1
+          fi
+          rm -rf /tmp/mirror
+          git clone --mirror \
+            "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+            /tmp/mirror
+          git config --global --add safe.directory /tmp/mirror
+
+      # Синхронизируем только ветки и теги (без refs/remotes и служебных refs):
+      # +refs/heads/* — force-push всех веток, +refs/tags/* — force-push всех тегов,
+      # --prune удаляет в GitHub ветки/теги, которых больше нет в GitVerse.
+      # Force-push тега из publish.yml (после sync_version) тоже попадёт сюда —
+      # это безопасно: публикация выполняется только в publish.yml на GitVerse.
+      - name: Push branches and tags to GitHub
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -e
+          if [ -z "${GH_PAT}" ]; then
+            echo "Секрет GH_PAT не задан" >&2
+            exit 1
+          fi
+          cd /tmp/mirror
+          git push --prune --force \
+            "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-client.git" \
+            "+refs/heads/*:refs/heads/*" \
+            "+refs/tags/*:refs/tags/*"
+          echo "Все ветки и теги GitVerse отправлены в GitHub-зеркало"

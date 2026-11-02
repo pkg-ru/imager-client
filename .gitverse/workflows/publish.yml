@@ -1,0 +1,393 @@
+name: Publish
+
+# Основной пайплайн релиза (GitVerse — основной репозиторий).
+# Все действия выполняются в одном контейнере (одна джоба build-publish):
+#  1. сборка и единый golden-тест всех реализаций (TS, PHP, Python, Go)
+#     через оркестратор go run test/test.go;
+#  2. sync_version.py вызывается ровно один раз за пайплайн —
+#     только после успешного прохождения всех тестов;
+#  3. синхронизированные манифесты коммитятся в тег (force-push),
+#     чтобы версия фиксировалась в теге;
+#  4. тот же коммит с версией пушится в master (без force-push),
+#     чтобы ветка не расходилась с тегом; если master ушёл вперёд
+#     (тег создан не из master), push пропускается с предупреждением;
+#  5. публикация пакетов в профильные репозитории выполняется ЗДЕСЬ,
+#     на GitVerse — авторизация для автопубликации есть только тут:
+#       - npm: imager-client, @pkg-ru/imager-react, @pkg-ru/imager-vue
+#         (секрет NPM_TOKEN, registry.npmjs.org);
+#       - PyPI: imager_client (секрет PYPI_TOKEN, twine upload);
+#       - Twig: pkg-ru/imager-twig — отдельный репозиторий composer-пакета,
+#         содержимое packages/twig пушится в master и в тег v<версия>
+#         (его читает Packagist);
+#  6. после публикации тег и master зеркалятся в GitHub
+#     (github.com/pkg-ru/imager-client) по GH_PAT — оттуда pkg.go.dev
+#     забирает Go-модуль.
+# Ветки и теги в GitHub также синхронизирует mirror.yml
+# (см. .gitverse/workflows/mirror.yml)。
+#
+# Повторный запуск после force-push тега (коммит манифестов) безопасен:
+# sync_version.py не найдёт изменений, а публикация идемпотентна —
+# уже занятая версия пропускается, а не валит job.
+#
+# Секреты GitVerse, необходимые пайплайну:
+#   GITVERSE_PAT — клон/пуш основного репозитория и Twig-пакета;
+#   NPM_TOKEN    — публикация в registry.npmjs.org;
+#   PYPI_TOKEN   — публикация на PyPI (username: __token__);
+#   GH_PAT       — пуш Twig-пакета и зеркалирование в GitHub.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-publish:
+    name: Build, Test & Publish
+    runs-on: ubuntu-latest
+
+    # Единый предварительно собранный CI-образ: PHP 8.1 + Composer,
+    # Node 22 + npm, Python 3.12, Go 1.23.7. Toolchain НЕ устанавливается
+    # в каждом запуске (см. .gitverse/docker/imager-ci/).
+    # Тег фиксированный (immutable), не latest.
+    container:
+      image: gitverse.ru/pkg-ru/imager-ci:2026.09.2
+
+    steps:
+      # Ручная клонировка вместо actions/checkout@v4: в кастомном
+      # CI-образе gitverse.ru/pkg-ru/imager-ci checkout-действие не
+      # создаёт корректно .git (ошибка "fatal: not in a git directory").
+      # Клонируем ВСЕ ветки и теги, чтобы force-push тегов работал.
+      - name: Clone repository
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          TARGET="${GITHUB_WORKSPACE:-$PWD}"
+          rm -rf /tmp/repo
+          git clone --no-single-branch \
+            "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+            /tmp/repo
+          # Копируем ВСЁ содержимое клона (включая .git и dot-файлы)
+          # в рабочую директорию: образ CI не содержит исходников проекта,
+          # а `cp -r /tmp/repo/*` не переносит dot-файлы.
+          rm -rf "${TARGET:?}/.git"
+          cp -a /tmp/repo/. "${TARGET:?}/"
+          # Git 2.35+ блокирует выполнение в директории, принадлежащей
+          # другому пользователю (dubious ownership). Регистрируем её.
+          git config --global --add safe.directory "${TARGET}"
+          cd "$TARGET"
+          git fetch --all --tags
+          git checkout "$TAG"
+          echo "Клонировано: $(git rev-parse --short HEAD) (тег $TAG)"
+
+      # Дешёвая ранняя проверка окружения: быстро показывает проблемы
+      # с CI-образом (неверная версия/отсутствующий toolchain).
+      - name: Check CI environment
+        run: |
+          set -e
+          php --version
+          composer --version
+          node --version
+          npm --version
+          python3 --version
+          go version
+
+      - name: Install npm dependencies
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          npm ci
+
+      # Пакеты react/vue участвуют в golden-тестах (HTML-кейсы fixture.json)
+      # и имеют собственные зависимости — устанавливаем их до прогона.
+      - name: Install package dependencies (react/vue)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/packages/react"
+          npm ci
+          cd "$GITHUB_WORKSPACE/packages/vue"
+          npm ci
+
+      - name: Build TypeScript
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          npm run build
+
+      # Единый golden-тест для всех языков: оркестратор go run test/test.go
+      # запускает TS (npm test), PHP (php test/test.php), Python (python test/test.py),
+      # Go-часть (RunGolden/RunAdmin) и пакеты react/vue последовательно.
+      - name: Test all languages (go run test/test.go)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          go run test/test.go
+
+      - name: Install PHP dependencies (twig for extension test)
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Test Twig package
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          php packages/twig/test/test.php
+
+      # sync_version.py — ровно один раз за пайплайн и только после того,
+      # как все тесты прошли успешно (шаг выше упал бы при любой ошибке)。
+      - name: Sync version from tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          python3 scripts/sync_version.py "$TAG"
+
+      # Коммитим синхронизированные манифесты в тег и force-push его
+      # в GitVerse (основной репозиторий), чтобы версия фиксировалась в теге.
+      - name: Commit synced manifests and update tag
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "pkg-ru-bot"
+          git config user.email "pkg-ru-bot@gitverse.ru"
+          git add package.json package-lock.json pyproject.toml \
+                  packages/react/package.json packages/react/package-lock.json \
+                  packages/vue/package.json packages/vue/package-lock.json \
+                  packages/twig/composer.json
+          if git diff --cached --quiet; then
+            echo "Манифесты уже синхронизированы, коммит не нужен"
+          else
+            git commit -m "chore: sync version to ${TAG#v}"
+            git push --force \
+              "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+              "HEAD:refs/tags/${TAG}"
+            echo "Тег ${TAG} обновлён коммитом с синхронизированными манифестами"
+          fi
+
+      # Пушим синхронизированные манифесты ещё и в master, чтобы ветка
+      # не расходилась с тегом. Без --force: если master ушёл вперёд
+      # (тег создан не из master), push упадёт — пропускаем с предупреждением,
+      # версия остаётся только в теге, публикация продолжается。
+      - name: Push version to master
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git push \
+            "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+            "HEAD:refs/heads/master" 2>/tmp/push-master.err; then
+            echo "Версия ${TAG#v} запушена в master"
+          else
+            echo "ВНИМАНИЕ: push в master не удался (вероятно, master ушёл вперёд)." >&2
+            cat /tmp/push-master.err >&2
+            echo "Версия ${TAG#v} осталась только в теге ${TAG}"
+          fi
+
+      # ------------------------------------------------------------------
+      # Публикация npm-пакетов (registry.npmjs.org).
+      # Авторизация — долгоживущий токен NPM_TOKEN из секретов GitVerse
+      # (OIDC-публикация, которую использует GitHub Actions, на GitVerse
+      # недоступна). Токен пишем в $HOME/.npmrc, а не в репозиторий.
+      # ------------------------------------------------------------------
+      - name: Configure npm auth
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -e
+          if [ -z "${NPM_TOKEN}" ]; then
+            echo "Секрет NPM_TOKEN не задан" >&2
+            exit 1
+          fi
+          printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
+          echo "npm auth настроен для registry.npmjs.org"
+
+      # Публикация ядра. prepublishOnly в корневом package.json отсутствует,
+      # поэтому dist уже собран шагом "Build TypeScript" выше.
+      - name: Publish imager-client to npm
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          VERSION="${TAG#v}"
+          if npm view "imager-client@${VERSION}" version >/dev/null 2>&1; then
+            echo "imager-client@${VERSION} уже опубликован — пропуск"
+          else
+            npm publish --access public
+          fi
+
+      # React-пакет: prepublishOnly соберёт dist самостоятельно,
+      # зависимости уже установлены шагом "Install package dependencies".
+      - name: Publish @pkg-ru/imager-react to npm
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/packages/react"
+          VERSION="${TAG#v}"
+          if npm view "@pkg-ru/imager-react@${VERSION}" version >/dev/null 2>&1; then
+            echo "@pkg-ru/imager-react@${VERSION} уже опубликован — пропуск"
+          else
+            npm publish --access public
+          fi
+
+      - name: Publish @pkg-ru/imager-vue to npm
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE/packages/vue"
+          VERSION="${TAG#v}"
+          if npm view "@pkg-ru/imager-vue@${VERSION}" version >/dev/null 2>&1; then
+            echo "@pkg-ru/imager-vue@${VERSION} уже опубликован — пропуск"
+          else
+            npm publish --access public
+          fi
+
+      # ------------------------------------------------------------------
+      # Публикация Python-пакета imager_client на PyPI.
+      # Авторизация — API-токен PYPI_TOKEN (Trusted Publisher/OIDC
+      # доступен только в GitHub Actions, на GitVerse его нет).
+      # --skip-existing делает повторный запуск идемпотентным.
+      # ------------------------------------------------------------------
+      - name: Install Python build tools
+        run: |
+          set -e
+          python3 -m pip install --upgrade build twine
+
+      # README для PyPI (doc/PY-RU.md) должен попасть в wheel:
+      # копируем его внутрь пакета imager как README.md
+      # (подключено как package-data в pyproject.toml)。
+      - name: Build Python distribution
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          cp doc/PY-RU.md src/imager/README.md
+          # Собираем в отдельную папку dist-python: dist/ уже занята
+          # npm-сборкой (dist/imager, dist/imager-server), и twine check
+          # падал бы на них с "Unknown distribution format".
+          rm -rf dist-python
+          python3 -m build --outdir dist-python
+          python3 -m twine check dist-python/*
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          set -e
+          if [ -z "${TWINE_PASSWORD}" ]; then
+            echo "Секрет PYPI_TOKEN не задан" >&2
+            exit 1
+          fi
+          cd "$GITHUB_WORKSPACE"
+          python3 -m twine upload --skip-existing --non-interactive dist-python/*
+          echo "Пакет imager_client отправлен на PyPI"
+
+      # ------------------------------------------------------------------
+      # Публикация Twig-пакета (composer/Packagist) в отдельный репозиторий
+      # pkg-ru/imager-twig.
+      # Содержимое packages/twig (composer.json, README.md, src/, test/)
+      # коммитится поверх существующего master репозитория пакета
+      # (fast-forward, история сохраняется) и пушится:
+      #   - в master (без force) — ветка не расходится с тегом;
+      #   - в тег v<версия> (force-push) — чтобы composer мог установить
+      #     пакет по тегу (composer require pkg-ru/imager-twig:^2.0.6).
+      # ВАЖНО: клонируем существующий репозиторий вместо git init — иначе
+      # новый root-коммит не является потомком master, push в master падает
+      # с non-fast-forward, и в репозитории остаётся старая версия (баг 2.0.6).
+      # Версия в composer.json уже проставлена sync_version.py выше.
+      #
+      # Репозиторий пакета — github.com/pkg-ru/imager-twig: именно на него
+      # указывает настройка пакета в Packagist, поэтому публикуем туда.
+      # Если GitHub-репозиторий недоступен, пробуем GitVerse-копию.
+      # ------------------------------------------------------------------
+      - name: Publish Twig package to pkg-ru/imager-twig
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          WORKSPACE="${GITHUB_WORKSPACE:-$PWD}"
+          GV_REMOTE="https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-twig.git"
+          GH_REMOTE="https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-twig.git"
+          rm -rf /tmp/imager-twig
+          if git clone --no-single-branch "$GH_REMOTE" /tmp/imager-twig 2>/dev/null; then
+            REMOTE="$GH_REMOTE"
+            echo "Репозиторий Twig-пакета: GitHub (источник пакета в Packagist)"
+          else
+            rm -rf /tmp/imager-twig
+            git clone --no-single-branch "$GV_REMOTE" /tmp/imager-twig
+            REMOTE="$GV_REMOTE"
+            echo "Репозиторий Twig-пакета: GitVerse (GitHub-репозиторий недоступен)"
+          fi
+          git config --global --add safe.directory /tmp/imager-twig
+          cd /tmp/imager-twig
+          git config user.name "pkg-ru-bot"
+          git config user.email "pkg-ru-bot@gitverse.ru"
+          # Заменяем содержимое пакета актуальной версией из релиза
+          rm -rf composer.json README.md src test
+          cp "${WORKSPACE}/packages/twig/composer.json" composer.json
+          cp "${WORKSPACE}/packages/twig/README.md" README.md
+          cp -r "${WORKSPACE}/packages/twig/src" src
+          cp -r "${WORKSPACE}/packages/twig/test" test
+          git add -A
+          # Если изменений нет (повторный запуск) — коммит не создаём
+          if git diff --cached --quiet; then
+            echo "Twig-пакет ${TAG} уже актуален, коммит не нужен"
+          else
+            git commit -q -m "chore: release ${TAG}"
+          fi
+          # master: без force, чтобы не затирать историю репозитория пакета.
+          git push "$REMOTE" "HEAD:refs/heads/master"
+          echo "Twig-пакет ${TAG} запушен в master репозитория пакета"
+          # тег: force-push, чтобы composer-версия всегда соответствовала релизу
+          git push --force "$REMOTE" "HEAD:refs/tags/${TAG}"
+          echo "Twig-пакет ${TAG} запушен в тег ${TAG} репозитория пакета"
+
+      # ------------------------------------------------------------------
+      # Зеркалирование релиза в GitHub (зеркало pkg-ru/imager-client).
+      # Тег — force-push (в теге лежит коммит с синхронизированными
+      # манифестами), master — без force; при расхождении push мастера
+      # пропускается с предупреждением, чтобы не потерять чужие коммиты.
+      # Ветки и теги также синхронизирует mirror.yml.
+      # ------------------------------------------------------------------
+      - name: Mirror tag and master to GitHub
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          cd "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          GH_REMOTE="https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-client.git"
+          git push --force "$GH_REMOTE" "HEAD:refs/tags/${TAG}"
+          echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitHub-зеркало"
+          if git push "$GH_REMOTE" "HEAD:refs/heads/master" 2>/tmp/push-gh-master.err; then
+            echo "master отправлен в GitHub-зеркало"
+          else
+            echo "ВНИМАНИЕ: push master в GitHub-зеркало не удался." >&2
+            cat /tmp/push-gh-master.err >&2
+          fi
+
+      - name: Summary
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          echo "Релиз ${TAG} завершён:"
+          echo "  npm  : imager-client, @pkg-ru/imager-react, @pkg-ru/imager-vue"
+          echo "  PyPI : imager_client"
+          echo "  Twig : gitverse.ru/pkg-ru/imager-twig"
+          echo "  GitHub-зеркало: gitverse.ru -> github.com/pkg-ru/imager-client"
