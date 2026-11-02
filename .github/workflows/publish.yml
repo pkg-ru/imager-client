@@ -108,6 +108,7 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
+          cd "$GITHUB_WORKSPACE"
           git config user.name "pkg-ru-bot"
           git config user.email "pkg-ru-bot@gitverse.ru"
           git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json packages/twig/composer.json
@@ -129,6 +130,7 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
+          cd "$GITHUB_WORKSPACE"
           if git push "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/heads/master" 2>/tmp/push-master.err; then
             echo "Версия ${TAG#v} запушена в master"
           else
@@ -194,6 +196,7 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
+          cd "$GITHUB_WORKSPACE"
           git push --force "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
           echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitVerse-зеркало"
 
