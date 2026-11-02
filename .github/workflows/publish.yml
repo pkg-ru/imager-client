@@ -100,6 +100,15 @@ jobs:
       - name: Sync version from tag
         run: python scripts/sync_version.py "${{ github.ref_name }}"
 
+      # Диагностика: где мы и где .git, чтобы понять, почему git не находит репозиторий.
+      - name: Diagnose workspace
+        run: |
+          echo "PWD=$PWD"
+          echo "GITHUB_WORKSPACE=${GITHUB_WORKSPACE:-<unset>}"
+          ls -la "${GITHUB_WORKSPACE:-.}" 2>/dev/null | head -20
+          echo "--- searching for .git ---"
+          find "${GITHUB_WORKSPACE:-.}" -maxdepth 3 -name .git -type d 2>/dev/null
+
       # Коммитим синхронизированные манифесты в тег и force-push его,
       # чтобы версия фиксировалась в теге.
       - name: Commit synced manifests and update tag
@@ -108,7 +117,15 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
-          cd "$GITHUB_WORKSPACE"
+          # Найти корень git-репозитория (actions/checkout@v4 может класть код не в $GITHUB_WORKSPACE).
+          GIT_ROOT="${GITHUB_WORKSPACE:-$PWD}"
+          if [ ! -d "$GIT_ROOT/.git" ]; then
+            FOUND="$(find "${GIT_ROOT}" -maxdepth 3 -name .git -type d -print -quit 2>/dev/null)"
+            if [ -n "$FOUND" ]; then
+              GIT_ROOT="$(dirname "$FOUND")"
+            fi
+          fi
+          cd "$GIT_ROOT"
           git config user.name "pkg-ru-bot"
           git config user.email "pkg-ru-bot@gitverse.ru"
           git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json packages/twig/composer.json
@@ -130,7 +147,14 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
-          cd "$GITHUB_WORKSPACE"
+          GIT_ROOT="${GITHUB_WORKSPACE:-$PWD}"
+          if [ ! -d "$GIT_ROOT/.git" ]; then
+            FOUND="$(find "${GIT_ROOT}" -maxdepth 3 -name .git -type d -print -quit 2>/dev/null)"
+            if [ -n "$FOUND" ]; then
+              GIT_ROOT="$(dirname "$FOUND")"
+            fi
+          fi
+          cd "$GIT_ROOT"
           if git push "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/heads/master" 2>/tmp/push-master.err; then
             echo "Версия ${TAG#v} запушена в master"
           else
@@ -196,7 +220,14 @@ jobs:
           GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
-          cd "$GITHUB_WORKSPACE"
+          GIT_ROOT="${GITHUB_WORKSPACE:-$PWD}"
+          if [ ! -d "$GIT_ROOT/.git" ]; then
+            FOUND="$(find "${GIT_ROOT}" -maxdepth 3 -name .git -type d -print -quit 2>/dev/null)"
+            if [ -n "$FOUND" ]; then
+              GIT_ROOT="$(dirname "$FOUND")"
+            fi
+          fi
+          cd "$GIT_ROOT"
           git push --force "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
           echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitVerse-зеркало"
 
