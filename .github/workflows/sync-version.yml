@@ -1,0 +1,93 @@
+name: Sync version manifests
+
+# При пуше нового тега v* проставляет версию в манифесты и обновляет
+# тег и master ЗДЕСЬ, на GitHub (исторически этот шаг жил на GitVerse
+# и падал: "fatal: Authentication failed ... gitverse.ru" — токена
+# VERSE_TOKEN для push там не было). На GitHub авторизация штатная
+# (GITHUB_TOKEN), а изменения улетают в GitVerse зеркалом
+# (.github/workflows/mirror.yml: GitHub -> GitVerse).
+#
+# Что делает:
+#   1. checkout тега с полной историей;
+#   2. scripts/sync_version.py <тег> — версия в package.json/lock,
+#      pyproject.toml, react/vue, twig composer.json;
+#   3. если есть изменения — коммит "chore: sync version to X.Y.Z";
+#      force-push тега (тег теперь указывает на коммит с версией)
+#      и push HEAD в master (без force; если master ушёл вперёд —
+#      предупреждение, версия остаётся только в теге);
+#   4. зеркало приносит обновлённый тег и master в GitVerse.
+#
+# Защита от цикла: повторный запуск по force-push тега не найдёт
+# изменений (sync_version идемпотентен) и ничего не запушит.
+# Публикация пакетов этот workflow не выполняет: npm/PyPI публикует
+# .github/workflows/publish.yml по repository_dispatch из GitVerse
+# (после его тестов), Twig — сам GitVerse.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-version-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync manifests into tag + master
+    runs-on: ubuntu-latest
+    steps:
+      # Полная история нужна, чтобы запушить и тег, и master из одного
+      # checkout'а. persist-credentials (по умолчанию) даёт push-права
+      # через GITHUB_TOKEN.
+      - name: Checkout tag (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Sync version from tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          python3 scripts/sync_version.py "$TAG"
+          node -p "'package.json version: ' + require('./package.json').version"
+
+      # Манифесты, которые трогает sync_version.py (как в историческом
+      # шаге "Commit synced manifests and update tag" на GitVerse).
+      - name: Commit synced manifests and update tag + master
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          git config user.name "pkg-ru-bot"
+          git config user.email "pkg-ru-bot@users.noreply.github.com"
+          git add package.json package-lock.json pyproject.toml \
+            packages/react/package.json packages/react/package-lock.json \
+            packages/vue/package.json packages/vue/package-lock.json \
+            packages/twig/composer.json
+          if git diff --cached --quiet; then
+            echo "Манифесты уже синхронизированы, коммит не нужен"
+            exit 0
+          fi
+          git commit -m "chore: sync version to ${TAG#v}"
+          # Тег: force-push, чтобы тег указывал на коммит с версией.
+          git push --force origin "HEAD:refs/tags/${TAG}"
+          echo "Тег ${TAG} обновлён (коммит с синхронизированными манифестами)"
+          # Master: без force. Если master ушёл вперёд (тег создан не из
+          # master), push упадёт — предупреждение, версия остаётся в теге.
+          if git push origin "HEAD:refs/heads/master"; then
+            echo "Версия ${TAG#v} запушена в master"
+          else
+            echo "ВНИМАНИЕ: push в master не удался (вероятно, master ушёл вперёд)." >&2
+            echo "Версия ${TAG#v} осталась только в теге ${TAG}" >&2
+          fi
