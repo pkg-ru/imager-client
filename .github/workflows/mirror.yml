@@ -9,9 +9,16 @@ name: Mirror to GitVerse
 # Зеркало приносит в GitVerse коммиты и теги, тег v* запускает публикацию
 # пакетов (npm, PyPI, Twig) уже на стороне GitVerse.
 #
-# Направление строго одно: GitHub -> GitVerse. Обратного зеркалирования нет
-# (иначе ветки и теги перезаписывали бы друг друга встречными force-push'ами),
-# поэтому publish.yml ничего не пушит в этот репозиторий.
+# Направление строго одно: GitHub -> GitVerse. Обратного зеркалирования нет,
+# поэтому зацикливания не возникает:
+#   GitHub push (тег/ветка) -> mirror.yml -> GitVerse (tag v* запускает
+#   publish.yml на GitVerse) -> publish.yml НЕ пушит в imager-client,
+#   только тесты/Twig/dispatch -> repository_dispatch в GitHub -> публикация
+#   npm/PyPI по OIDC. Дальше цепочка обрывается.
+#
+# Синхронизацию манифестов версии (.github/workflows/sync-version.yml)
+# выполняет ТОЛЬКО GitHub: он коммитит версию и пушит в master и в сам тег
+# (GITHUB_TOKEN), а mirror.yml приносит эти изменения в GitVerse.
 #
 # Секрет: GITVERSE_PAT (или VERSE_TOKEN) — токен с правом push
 # в gitverse.ru/pkg-ru/imager-client. Задаётся в настройках GitHub-репозитория:
@@ -94,8 +101,37 @@ jobs:
             exit 1
           fi
           cd /tmp/mirror
+          # Ветки: обычный force-push.
           git push --prune --force \
             "https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-client.git" \
-            "+refs/heads/*:refs/heads/*" \
-            "+refs/tags/*:refs/tags/*"
-          echo "Все ветки и теги GitHub отправлены в GitVerse-зеркало"
+            "+refs/heads/*:refs/heads/*"
+          echo "Ветки GitHub отправлены в GitVerse-зеркало"
+          # Теги: по одному. GitVerse отклоняет force-update существующего
+          # тега с "incorrect old value provided" (защита от гонок при
+          # перезаписи тега), поэтому при отказе пересоздаём тег:
+          # сначала удаляем, потом пушим заново.
+          FAIL=0
+          for TAGREF in $(git for-each-ref refs/tags --format='%(refname)'); do
+            if git push --force \
+                 "https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+                 "+${TAGREF}:${TAGREF}"; then
+              continue
+            fi
+            echo "Force-push ${TAGREF} отклонён, пересоздаю тег..."
+            git push \
+              "https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+              ":${TAGREF}" || true
+            if git push \
+                 "https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+                 "${TAGREF}:${TAGREF}"; then
+              echo "${TAGREF}: пересоздан"
+            else
+              echo "${TAGREF}: не удалось обновить" >&2
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" != "0" ]; then
+            echo "Часть тегов не синхронизирована" >&2
+            exit 1
+          fi
+          echo "Все теги GitHub отправлены в GitVerse-зеркало"
