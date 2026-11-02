@@ -16,6 +16,13 @@ name: Mirror to GitVerse
 # Секрет: GITVERSE_PAT (или VERSE_TOKEN) — токен с правом push
 # в gitverse.ru/pkg-ru/imager-client. Задаётся в настройках GitHub-репозитория:
 # Settings -> Secrets and variables -> Actions.
+#
+# ВАЖНО: GitVerse читает не только .gitverse/workflows, но и .github/workflows,
+# то есть запускает этот файл у себя (в прогонах GitVerse он виден как
+# "Mirror to GitVerse" с корнем ".github"). На GitVerse он бесполезен и опасен:
+# он бы заливал GitHub в GitVerse по кругу (push -> новый прогон -> push ...).
+# Поэтому каждый шаг начинается с проверки GITHUB_SERVER_URL и на любом хосте,
+# кроме github.com, завершается успешным no-op.
 
 on:
   push:
@@ -46,6 +53,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          # Guard: выполняться только на github.com (на GitVerse этот файл
+          # тоже подхватывается и создал бы цикл зеркалирования).
+          case "${GITHUB_SERVER_URL:-}" in
+            ""|https://github.com) ;;
+            *)
+              echo "Хост ${GITHUB_SERVER_URL}: это зеркало GitHub -> GitVerse, здесь не нужно."
+              exit 0
+              ;;
+          esac
           rm -rf /tmp/mirror
           git clone --mirror \
             "https://x-access-token:${GH_TOKEN}@github.com/pkg-ru/imager-client.git" \
@@ -65,6 +81,13 @@ jobs:
           VERSE_TOKEN: ${{ secrets.VERSE_TOKEN }}
         run: |
           set -e
+          case "${GITHUB_SERVER_URL:-}" in
+            ""|https://github.com) ;;
+            *)
+              echo "Хост ${GITHUB_SERVER_URL}: шаг пуша в GitVerse выполняется только на GitHub."
+              exit 0
+              ;;
+          esac
           PAT="${GITVERSE_PAT:-$VERSE_TOKEN}"
           if [ -z "$PAT" ]; then
             echo "Не задан секрет GITVERSE_PAT (или VERSE_TOKEN)" >&2
