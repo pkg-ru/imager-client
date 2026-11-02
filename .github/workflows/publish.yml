@@ -92,8 +92,16 @@ jobs:
           VERSION="${TAG#v}"
           if npm view "imager-client@${VERSION}" version >/dev/null 2>&1; then
             echo "imager-client@${VERSION} уже опубликован — пропуск"
+          elif npm publish --provenance --access public; then
+            echo "Опубликовано"
           else
-            npm publish --provenance --access public
+            # Гонка параллельных dispatch: E409 "previously staged version".
+            sleep 5
+            if npm view "imager-client@${VERSION}" version >/dev/null 2>&1; then
+              echo "Версия опубликована параллельным прогоном — пропуск"
+            else
+              exit 1
+            fi
           fi
 
       - name: Publish @pkg-ru/imager-react to npm
@@ -107,8 +115,18 @@ jobs:
           npm run build
           if npm view "@pkg-ru/imager-react@${VERSION}" version >/dev/null 2>&1; then
             echo "@pkg-ru/imager-react@${VERSION} уже опубликован — пропуск"
+          elif npm publish --provenance --access public; then
+            echo "Опубликовано"
           else
-            npm publish --provenance --access public
+            # Гонка двух dispatch (двойной тег-пуш): второй publish получает
+            # E409 "previously staged version". Если версия уже в реестре —
+            # это не ошибка.
+            sleep 5
+            if npm view "@pkg-ru/imager-react@${VERSION}" version >/dev/null 2>&1; then
+              echo "Версия опубликована параллельным прогоном — пропуск"
+            else
+              exit 1
+            fi
           fi
 
       - name: Publish @pkg-ru/imager-vue to npm
@@ -122,8 +140,16 @@ jobs:
           npm run build
           if npm view "@pkg-ru/imager-vue@${VERSION}" version >/dev/null 2>&1; then
             echo "@pkg-ru/imager-vue@${VERSION} уже опубликован — пропуск"
+          elif npm publish --provenance --access public; then
+            echo "Опубликовано"
           else
-            npm publish --provenance --access public
+            # Гонка параллельных dispatch: E409 "previously staged version".
+            sleep 5
+            if npm view "@pkg-ru/imager-vue@${VERSION}" version >/dev/null 2>&1; then
+              echo "Версия опубликована параллельным прогоном — пропуск"
+            else
+              exit 1
+            fi
           fi
 
       - name: Install build tools (PyPI)
