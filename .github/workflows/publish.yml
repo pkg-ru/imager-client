@@ -1,0 +1,151 @@
+name: Publish (npm + PyPI)
+
+# Публикация npm и PyPI. Запускается ТОЛЬКО по repository_dispatch из
+# GitVerse (.gitverse/workflows/publish.yml) — там живёт оркестратор релиза.
+#
+# Почему npm/PyPI публикуются здесь, а не на GitVerse:
+#   registry.npmjs.org и pypi.org поддерживают OIDC-публикацию без
+#   долгоживущих токенов только через GitHub Actions (Trusted Publisher).
+#   Именно так выходили релизы 2.0.4-2.0.6: у npm-версий _npmUser =
+#   "GitHub Actions" (npm-oidc-no-reply@github.com, trustedPublisher github).
+#   Если в GitVerse появятся секреты NPM_TOKEN и PYPI_API_TOKEN, его
+#   пайплайн публикует сам и dispatch не отправляет.
+#
+# Тег приходит в GitHub через зеркало .github/workflows/mirror.yml, поэтому
+# здесь достаточно checkout тега из payload и повторного sync_version.py
+# (версия в манифестах = версия из тега; шаг идемпотентен).
+# Прямой push тега в GitHub публикацию НЕ запускает — только dispatch,
+# чтобы исключить двойную публикацию при зеркалировании.
+
+on:
+  repository_dispatch:
+    types: [publish]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish (npm + PyPI)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC: npm trusted publishing + provenance, PyPI Trusted Publisher
+      contents: read
+    steps:
+      # Имя тега приходит в payload dispatch из GitVerse.
+      - name: Resolve tag name
+        id: tag
+        env:
+          PAYLOAD_TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          set -e
+          TAG="$PAYLOAD_TAG"
+          case "$TAG" in
+            v*) ;;
+            *) echo "Некорректный тег: $TAG" >&2; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Публикация по тегу: $TAG"
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Версия в манифестах проставляется из тега здесь же: тег приходит
+      # зеркалом как есть, поэтому sync_version.py — единственный источник
+      # версии. Повторный вызов идемпотентен (без изменений = без diff).
+      - name: Sync version from tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -e
+          python3 scripts/sync_version.py "$TAG"
+          node -p "'package.json version: ' + require('./package.json').version"
+
+      # registry-url НЕ указываем: он создаёт .npmrc с _authToken=${NODE_AUTH_TOKEN},
+      # а пустой токен перебивает OIDC-аутентификацию npm publish.
+      # npm OIDC publishing сам получает токен из окружения GitHub Actions.
+      - name: Setup Node.js 24 (npm provenance requires Node >= 24)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build core (imager-client)
+        run: npm run build
+
+      # npm view-проверка делает повторный dispatch идемпотентным:
+      # уже опубликованная версия пропускается.
+      - name: Publish core to npm (OIDC publishing + provenance, no token)
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -e
+          VERSION="${TAG#v}"
+          if npm view "imager-client@${VERSION}" version >/dev/null 2>&1; then
+            echo "imager-client@${VERSION} уже опубликован — пропуск"
+          else
+            npm publish --provenance --access public
+          fi
+
+      - name: Publish @pkg-ru/imager-react to npm
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -e
+          VERSION="${TAG#v}"
+          cd packages/react
+          npm ci
+          npm run build
+          if npm view "@pkg-ru/imager-react@${VERSION}" version >/dev/null 2>&1; then
+            echo "@pkg-ru/imager-react@${VERSION} уже опубликован — пропуск"
+          else
+            npm publish --provenance --access public
+          fi
+
+      - name: Publish @pkg-ru/imager-vue to npm
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -e
+          VERSION="${TAG#v}"
+          cd packages/vue
+          npm ci
+          npm run build
+          if npm view "@pkg-ru/imager-vue@${VERSION}" version >/dev/null 2>&1; then
+            echo "@pkg-ru/imager-vue@${VERSION} уже опубликован — пропуск"
+          else
+            npm publish --provenance --access public
+          fi
+
+      - name: Install build tools (PyPI)
+        run: python -m pip install --upgrade build twine
+
+      # README для PyPI (doc/PY-RU.md) должен попасть в wheel:
+      # копируем его внутрь пакета imager как README.md
+      # (подключено как package-data в pyproject.toml)
+      - name: Copy README into package
+        run: cp doc/PY-RU.md src/imager/README.md
+
+      # Собираем в отдельную папку dist-python: dist/ уже занята npm-сборкой
+      # (dist/imager, dist/imager-server), и twine check падал бы на этих
+      # директориях с "Unknown distribution format".
+      - name: Build distribution
+        run: python -m build --outdir dist-python
+
+      - name: Check distribution
+        run: python -m twine check dist-python/*
+
+      - name: Publish to PyPI (OIDC Trusted Publisher, no token)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-python
+          skip-existing: true

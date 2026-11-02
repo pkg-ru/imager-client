@@ -1,14 +1,14 @@
 name: Publish
 
-# Пайплайн публикации пакетов (GitVerse — там есть авторизация
-# для автопубликации пакетов).
+# Пайплайн релиза пакетов: оркестратор живёт на GitVerse.
 #
 # Роли репозиториев:
 #   GitHub (github.com/pkg-ru/imager-client) — источник изменений;
 #     .github/workflows/mirror.yml зеркалирует ветки и теги в GitVerse;
+#     .github/workflows/publish.yml публикует npm/PyPI по repository_dispatch
+#     (эти реестры поддерживают OIDC-публикацию только через GitHub Actions).
 #   GitVerse (gitverse.ru/pkg-ru/imager-client) — приёмник зеркала и
-#     ЕДИНСТВЕННОЕ место, где публикуются пакеты (npm, PyPI, Twig),
-#     потому что только там есть токены для автопубликации.
+#     оркестратор релиза: тесты, sync_version, публикация Twig.
 # Обратного зеркалирования (GitVerse -> GitHub) нет: иначе ветки и теги
 # уходили бы встречными force-push'ами. Поэтому этот пайплайн НИЧЕГО
 # не пушит в основной репозиторий — только читает.
@@ -20,13 +20,19 @@ name: Publish
 #     только после успешного прохождения всех тестов; версия из тега
 #     проставляется в манифестах прямо в рабочей директории;
 #  3. публикация пакетов в профильные репозитории:
-#       - npm: imager-client, @pkg-ru/imager-react, @pkg-ru/imager-vue
-#         (секрет NPM_TOKEN, registry.npmjs.org);
-#       - PyPI: imager_client (секрет PYPI_API_TOKEN / PYPI_TOKEN,
-#         twine upload --skip-existing);
 #       - Twig: pkg-ru/imager-twig — отдельный репозиторий composer-пакета,
 #         содержимое packages/twig пушится в master и в тег v<версия>
-#         (его читает Packagist).
+#         (его читает Packagist). Секрет GH_PAT;
+#       - npm (imager-client, @pkg-ru/imager-react, @pkg-ru/imager-vue)
+#         и PyPI (imager_client) — по одному из двух бэкендов:
+#           gitverse — если в секретах GitVerse заданы NPM_TOKEN и
+#                      PYPI_API_TOKEN (PYPI_TOKEN): публикуем здесь;
+#           dispatch — если их нет: отправляем repository_dispatch в GitHub,
+#                      и npm/PyPI публикует .github/workflows/publish.yml
+#                      по OIDC (без долгоживущих токенов). Именно так
+#                      выходили релизы 2.0.4-2.0.6: npm-публикации имеют
+#                      _npmUser "GitHub Actions" (npm-oidc-no-reply@github.com).
+#     Бэкенд выбирается автоматически, повторного запуска не требует.
 #
 # Манифесты с версией НЕ коммитятся обратно в тег/ветку: тег приходит
 # зеркалом из GitHub, и обратный force-push конфликтовал бы со следующим
@@ -34,15 +40,16 @@ name: Publish
 # composer.json репозитория пакета) в рамках этого запуска.
 #
 # Повторный запуск безопасен: sync_version.py идемпотентен, а публикация
-# пропускает уже занятые версии (npm view / twine --skip-existing).
+# пропускает уже занятые версии (npm view / twine --skip-existing /
+# pypa-gh-action-pypi-publish skip-existing).
 #
-# Секреты GitVerse, необходимые пайплайну:
-#   NPM_TOKEN      — публикация в registry.npmjs.org;
-#   PYPI_API_TOKEN — публикация на PyPI (или синоним PYPI_TOKEN);
-#   GH_PAT         — пуш Twig-пакета в github.com/pkg-ru/imager-twig.
+# Секреты GitVerse:
+#   GH_PAT         — обязателен: пуш Twig-пакета и dispatch в GitHub;
+#   NPM_TOKEN      — опционален: включает публикацию npm на GitVerse;
+#   PYPI_API_TOKEN — опционален (синоним PYPI_TOKEN): публикация на PyPI
+#                    на GitVerse. Без обоих работает dispatch-бэкенд.
 # Токен для доступа к самому репозиторию НЕ нужен: клон идёт по HTTPS
 # из публичного репозитория, а этот пайплайн ничего в него не пушит.
-# Наличие секретов проверяется шагом Validate secrets до сборки и тестов.
 
 on:
   push:
@@ -111,9 +118,14 @@ jobs:
           python3 --version
           go version
 
-      # Ранняя проверка секретов: падаем сразу, а не после 20 минут тестов.
-      # Значения не печатаем — только наличие (логи GitVerse публичные).
-      - name: Validate secrets
+      # Выбор бэкенда публикации npm/PyPI — до сборки и тестов, чтобы
+      # ранняя ошибка была дешёвой. Значения секретов не печатаем
+      # (логи GitVerse публичные), только факт наличия.
+      #   gitverse — есть NPM_TOKEN и токен PyPI: публикуем на GitVerse;
+      #   dispatch — токенов нет: npm/PyPI публикует GitHub по OIDC,
+      #              мы только отправим repository_dispatch.
+      # GH_PAT обязателен в любом режиме (Twig-пакет + dispatch).
+      - name: Detect publish backend
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -121,22 +133,25 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           set -e
-          missing=""
-          [ -n "$NPM_TOKEN" ] && echo "NPM_TOKEN: задан" || { echo "NPM_TOKEN: НЕ задан"; missing="$missing NPM_TOKEN"; }
-          if [ -n "${PYPI_API_TOKEN:-}" ]; then
-            echo "PYPI_API_TOKEN: задан"
-          elif [ -n "${PYPI_TOKEN:-}" ]; then
-            echo "PYPI_TOKEN: задан (синоним)"
-          else
-            echo "PYPI_API_TOKEN: НЕ задан"
-            missing="$missing PYPI_API_TOKEN"
-          fi
-          [ -n "$GH_PAT" ] && echo "GH_PAT: задан" || { echo "GH_PAT: НЕ задан"; missing="$missing GH_PAT"; }
-          if [ -n "$missing" ]; then
-            echo "Не заданы секреты:$missing" >&2
-            echo "Добавьте их в настройках репозитория GitVerse (Settings -> Secrets)." >&2
+          if [ -z "$GH_PAT" ]; then
+            echo "Не задан секрет GH_PAT: без него не опубликовать Twig-пакет" >&2
+            echo "и не отправить dispatch на публикацию npm/PyPI." >&2
             exit 1
           fi
+          echo "GH_PAT: задан"
+          PYPI="${PYPI_API_TOKEN:-$PYPI_TOKEN}"
+          if [ -n "$NPM_TOKEN" ] && [ -n "$PYPI" ]; then
+            MODE=gitverse
+            echo "NPM_TOKEN: задан"
+            echo "PYPI_API_TOKEN: задан"
+          else
+            MODE=dispatch
+            [ -n "$NPM_TOKEN" ] || echo "NPM_TOKEN: не задан"
+            [ -n "$PYPI" ] || echo "PYPI_API_TOKEN: не задан"
+            echo "npm/PyPI будут опубликованы на GitHub по OIDC (dispatch)"
+          fi
+          echo "MODE=$MODE" >> "$GITHUB_ENV"
+          echo "Бэкенд публикации npm/PyPI: $MODE"
 
       - name: Install npm dependencies
         run: |
@@ -199,18 +214,18 @@ jobs:
 
       # ------------------------------------------------------------------
       # Публикация npm-пакетов (registry.npmjs.org).
-      # Авторизация — долгоживущий токен NPM_TOKEN из секретов GitVerse
-      # (OIDC-публикация, которую использует GitHub Actions, на GitVerse
-      # недоступна). Токен пишем в $HOME/.npmrc, а не в репозиторий.
+      # Выполняется только при MODE=gitverse (есть NPM_TOKEN). Иначе шаги
+      # пропускаются, а публикацию делает GitHub по OIDC после dispatch.
+      # Токен пишем в $HOME/.npmrc, а не в репозиторий.
       # ------------------------------------------------------------------
       - name: Configure npm auth
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -e
-          if [ -z "${NPM_TOKEN}" ]; then
-            echo "Секрет NPM_TOKEN не задан" >&2
-            exit 1
+          if [ "$MODE" != "gitverse" ]; then
+            echo "MODE=$MODE — npm публикует GitHub, шаг не нужен"
+            exit 0
           fi
           printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > "$HOME/.npmrc"
           echo "npm auth настроен для registry.npmjs.org"
@@ -222,6 +237,10 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -e
+          if [ "$MODE" != "gitverse" ]; then
+            echo "MODE=$MODE — imager-client публикует GitHub"
+            exit 0
+          fi
           cd "$GITHUB_WORKSPACE"
           VERSION="${TAG#v}"
           if npm view "imager-client@${VERSION}" version >/dev/null 2>&1; then
@@ -237,6 +256,10 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -e
+          if [ "$MODE" != "gitverse" ]; then
+            echo "MODE=$MODE — @pkg-ru/imager-react публикует GitHub"
+            exit 0
+          fi
           cd "$GITHUB_WORKSPACE/packages/react"
           VERSION="${TAG#v}"
           if npm view "@pkg-ru/imager-react@${VERSION}" version >/dev/null 2>&1; then
@@ -250,6 +273,10 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -e
+          if [ "$MODE" != "gitverse" ]; then
+            echo "MODE=$MODE — @pkg-ru/imager-vue публикует GitHub"
+            exit 0
+          fi
           cd "$GITHUB_WORKSPACE/packages/vue"
           VERSION="${TAG#v}"
           if npm view "@pkg-ru/imager-vue@${VERSION}" version >/dev/null 2>&1; then
@@ -268,6 +295,10 @@ jobs:
       - name: Install Python build tools
         run: |
           set -e
+          if [ "$MODE" != "gitverse" ]; then
+            echo "MODE=$MODE — PyPI публикует GitHub, инструменты не нужны"
+            exit 0
+          fi
           python3 -m pip install --upgrade build twine
 
       # README для PyPI (doc/PY-RU.md) должен попасть в wheel:
@@ -276,6 +307,10 @@ jobs:
       - name: Build Python distribution
         run: |
           set -e
+          if [ "$MODE" != "gitverse" ]; then
+            echo "MODE=$MODE — сборку wheel делает GitHub"
+            exit 0
+          fi
           cd "$GITHUB_WORKSPACE"
           cp doc/PY-RU.md src/imager/README.md
           # Собираем в отдельную папку dist-python: dist/ уже занята
@@ -292,6 +327,10 @@ jobs:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
           set -e
+          if [ "$MODE" != "gitverse" ]; then
+            echo "MODE=$MODE — imager_client публикует GitHub по OIDC"
+            exit 0
+          fi
           # Имя секрета исторически: PYPI_API_TOKEN (старый пайплайн GitVerse);
           # PYPI_TOKEN поддерживается как синоним.
           TWINE_PASSWORD="${PYPI_API_TOKEN:-$PYPI_TOKEN}"
@@ -362,6 +401,38 @@ jobs:
           echo "Twig-пакет ${TAG} запушен в тег ${TAG} репозитория пакета"
 
       # ------------------------------------------------------------------
+      # Dispatch-бэкенд: npm и PyPI публикует GitHub Actions по OIDC
+      # (.github/workflows/publish.yml, on: repository_dispatch publish).
+      # Это единственный способ для npm/PyPI без долгоживущих токенов:
+      # npm публикует с _npmUser "GitHub Actions" (npm-oidc-no-reply@
+      # github.com, trusted publisher), PyPI — через Trusted Publisher.
+      # Тег уже принесён зеркалом .github/workflows/mirror.yml, поэтому
+      # GitHub сделает checkout того же тега и повторит sync_version.py.
+      # ------------------------------------------------------------------
+      - name: Dispatch npm/PyPI publish to GitHub
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          if [ "$MODE" != "dispatch" ]; then
+            echo "MODE=$MODE — npm/PyPI уже опубликованы на GitVerse"
+            exit 0
+          fi
+          http_code=$(curl -sS -o /tmp/dispatch-response.json -w '%{http_code}' \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_PAT}" \
+            https://api.github.com/repos/pkg-ru/imager-client/dispatches \
+            -d "{\"event_type\":\"publish\",\"client_payload\":{\"tag\":\"${TAG}\"}}")
+          if [ "$http_code" != "204" ]; then
+            echo "GitHub API вернул $http_code:" >&2
+            cat /tmp/dispatch-response.json >&2
+            exit 1
+          fi
+          echo "repository_dispatch 'publish' (tag: ${TAG}) отправлен: npm/PyPI опубликует GitHub"
+
+      # ------------------------------------------------------------------
       # Зеркалирование в GitHub выполняет .github/workflows/mirror.yml
       # на стороне GitHub (GitHub -> GitVerse), обратного пуша здесь нет.
       # ------------------------------------------------------------------
@@ -370,6 +441,14 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           echo "Релиз ${TAG} завершён:"
-          echo "  npm  : imager-client, @pkg-ru/imager-react, @pkg-ru/imager-vue"
-          echo "  PyPI : imager_client"
           echo "  Twig : github.com/pkg-ru/imager-twig (источник пакета в Packagist)"
+          case "$MODE" in
+            gitverse)
+              echo "  npm  : imager-client, @pkg-ru/imager-react, @pkg-ru/imager-vue (GitVerse, NPM_TOKEN)"
+              echo "  PyPI : imager_client (GitVerse, PYPI_API_TOKEN)"
+              ;;
+            *)
+              echo "  npm  : imager-client, @pkg-ru/imager-react, @pkg-ru/imager-vue (GitHub, OIDC по dispatch)"
+              echo "  PyPI : imager_client (GitHub, Trusted Publisher по dispatch)"
+              ;;
+          esac
