@@ -37,10 +37,12 @@ name: Publish
 # пропускает уже занятые версии (npm view / twine --skip-existing).
 #
 # Секреты GitVerse, необходимые пайплайну:
-#   VERSE_TOKEN (или GITVERSE_PAT) — доступ к репозиторию GitVerse;
-#   NPM_TOKEN    — публикация в registry.npmjs.org;
-#   PYPI_API_TOKEN (или PYPI_TOKEN) — публикация на PyPI (__token__);
-#   GH_PAT       — пуш Twig-пакета в github.com/pkg-ru/imager-twig.
+#   NPM_TOKEN      — публикация в registry.npmjs.org;
+#   PYPI_API_TOKEN — публикация на PyPI (или синоним PYPI_TOKEN);
+#   GH_PAT         — пуш Twig-пакета в github.com/pkg-ru/imager-twig.
+# Токен для доступа к самому репозиторию НЕ нужен: клон идёт по HTTPS
+# из публичного репозитория, а этот пайплайн ничего в него не пушит.
+# Наличие секретов проверяется шагом Validate secrets до сборки и тестов.
 
 on:
   push:
@@ -63,7 +65,10 @@ jobs:
       # Ручная клонировка вместо actions/checkout@v4: в кастомном
       # CI-образе gitverse.ru/pkg-ru/imager-ci checkout-действие не
       # создаёт корректно .git (ошибка "fatal: not in a git directory").
-      # Клонируем ВСЕ ветки и теги, чтобы force-push тегов работал.
+      # Клонируем ВСЕ ветки и теги, чтобы тег всегда был доступен.
+      # Репозиторий публичный, поэтому токен не обязателен: без него
+      # клонируем анонимно (раньше отсутствие токена ломало job только
+      # на шаге push, а он больше не нужен).
       - name: Clone repository
         env:
           VERSE_TOKEN: ${{ secrets.VERSE_TOKEN }}
@@ -72,15 +77,15 @@ jobs:
         run: |
           set -e
           PAT="${VERSE_TOKEN:-$GITVERSE_PAT}"
-          if [ -z "$PAT" ]; then
-            echo "Не задан секрет VERSE_TOKEN (или GITVERSE_PAT)" >&2
-            exit 1
+          if [ -n "$PAT" ]; then
+            REPO_URL="https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-client.git"
+          else
+            REPO_URL="https://gitverse.ru/pkg-ru/imager-client.git"
+            echo "Секрет VERSE_TOKEN не задан — клонирую анонимно (репозиторий публичный)"
           fi
           TARGET="${GITHUB_WORKSPACE:-$PWD}"
           rm -rf /tmp/repo
-          git clone --no-single-branch \
-            "https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-client.git" \
-            /tmp/repo
+          git clone --no-single-branch "$REPO_URL" /tmp/repo
           # Копируем ВСЁ содержимое клона (включая .git и dot-файлы)
           # в рабочую директорию: образ CI не содержит исходников проекта,
           # а `cp -r /tmp/repo/*` не переносит dot-файлы.
@@ -105,6 +110,33 @@ jobs:
           npm --version
           python3 --version
           go version
+
+      # Ранняя проверка секретов: падаем сразу, а не после 20 минут тестов.
+      # Значения не печатаем — только наличие (логи GitVerse публичные).
+      - name: Validate secrets
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -e
+          missing=""
+          [ -n "$NPM_TOKEN" ] && echo "NPM_TOKEN: задан" || { echo "NPM_TOKEN: НЕ задан"; missing="$missing NPM_TOKEN"; }
+          if [ -n "${PYPI_API_TOKEN:-}" ]; then
+            echo "PYPI_API_TOKEN: задан"
+          elif [ -n "${PYPI_TOKEN:-}" ]; then
+            echo "PYPI_TOKEN: задан (синоним)"
+          else
+            echo "PYPI_API_TOKEN: НЕ задан"
+            missing="$missing PYPI_API_TOKEN"
+          fi
+          [ -n "$GH_PAT" ] && echo "GH_PAT: задан" || { echo "GH_PAT: НЕ задан"; missing="$missing GH_PAT"; }
+          if [ -n "$missing" ]; then
+            echo "Не заданы секреты:$missing" >&2
+            echo "Добавьте их в настройках репозитория GitVerse (Settings -> Secrets)." >&2
+            exit 1
+          fi
 
       - name: Install npm dependencies
         run: |
@@ -288,30 +320,23 @@ jobs:
       #
       # Репозиторий пакета — github.com/pkg-ru/imager-twig: именно на него
       # указывает настройка пакета в Packagist, поэтому публикуем туда.
-      # Если GitHub-репозиторий недоступен, пробуем GitVerse-копию.
       # ------------------------------------------------------------------
       - name: Publish Twig package to pkg-ru/imager-twig
         env:
-          VERSE_TOKEN: ${{ secrets.VERSE_TOKEN }}
-          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
           GH_PAT: ${{ secrets.GH_PAT }}
           TAG: ${{ github.ref_name }}
         run: |
           set -e
           WORKSPACE="${GITHUB_WORKSPACE:-$PWD}"
-          PAT="${VERSE_TOKEN:-$GITVERSE_PAT}"
-          GV_REMOTE="https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-twig.git"
+          if [ -z "$GH_PAT" ]; then
+            echo "Не задан секрет GH_PAT (нужен для push в pkg-ru/imager-twig)" >&2
+            exit 1
+          fi
           GH_REMOTE="https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-twig.git"
           rm -rf /tmp/imager-twig
-          if git clone --no-single-branch "$GH_REMOTE" /tmp/imager-twig 2>/dev/null; then
-            REMOTE="$GH_REMOTE"
-            echo "Репозиторий Twig-пакета: GitHub (источник пакета в Packagist)"
-          else
-            rm -rf /tmp/imager-twig
-            git clone --no-single-branch "$GV_REMOTE" /tmp/imager-twig
-            REMOTE="$GV_REMOTE"
-            echo "Репозиторий Twig-пакета: GitVerse (GitHub-репозиторий недоступен)"
-          fi
+          git clone --no-single-branch "$GH_REMOTE" /tmp/imager-twig
+          REMOTE="$GH_REMOTE"
+          echo "Репозиторий Twig-пакета: GitHub (источник пакета в Packagist)"
           git config --global --add safe.directory /tmp/imager-twig
           cd /tmp/imager-twig
           git config user.name "pkg-ru-bot"
