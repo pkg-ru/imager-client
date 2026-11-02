@@ -67,6 +67,9 @@ jobs:
           # Добавляем .git в рабочую директорию, не трогая исходные файлы
           rm -rf "${TARGET}/.git"
           cp -r /tmp/repo/.git "${TARGET}/.git"
+          # Git 2.35+ блокирует выполнение в directorии, принадлежащей
+          # другому пользователю (dubious ownership). Регистрируем её как безопасную.
+          git config --global --add safe.directory "${TARGET}"
           cd "$TARGET"
           git fetch --all --tags
           git checkout "${{ github.ref_name }}"
@@ -133,6 +136,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           cd "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config user.name "pkg-ru-bot"
           git config user.email "pkg-ru-bot@gitverse.ru"
           git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json packages/twig/composer.json
@@ -155,6 +159,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           cd "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           if git push "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/heads/master" 2>/tmp/push-master.err; then
             echo "Версия ${TAG#v} запушена в master"
           else
@@ -221,6 +226,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           cd "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git push --force "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
           echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitVerse-зеркало"
 
