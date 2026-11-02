@@ -326,13 +326,13 @@ interface AssetType {
 
 ### Экспорты
 
-Клиентская точка входа [`imager-client`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts/index.ts) экспортирует:
+Клиентская точка входа [`imager-client`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-ts/index.ts) экспортирует:
 
 - Классы/типы: `Imager` (и default), `AssetPath`, `AssetType`, `ImagerOptions`, `Segment`, `mimeFor`
 - Компонентный слой (`component.ts`): `normalizeProps`, `ImagerComponentProps`, `NormalizedCall`, `NormalizePropsOptions`
 - Рендер-слой (`render.ts`): `IMG_ATTRS`, `HtmlGroup`, `buildSrcset`, `fmtDescriptor`, `groupAssets`, `pickImgGroup`, `splitAttrs`, `useWidthDescriptors`
 
-Серверная точка входа [`imager-client/server`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts-server/index.ts) экспортирует: `ImagerServer`, `Imager`, `AssetPath`, `AssetType`, `ImagerOptions`, `ImagerServerOptions`, `Segment`, `mimeFor`.
+Серверная точка входа [`imager-client/server`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-ts-server/index.ts) экспортирует: `ImagerServer`, `Imager`, `AssetPath`, `AssetType`, `ImagerOptions`, `ImagerServerOptions`, `Segment`, `mimeFor`.
 
 `normalizeFormat`, `resolveFormat`, `dedupeFormats`, `IMAGE_FORMATS` **не экспортируются** из клиентской точки входа (внутренние функции модуля `ImagerTypes.ts`).
 

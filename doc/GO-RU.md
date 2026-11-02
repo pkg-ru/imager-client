@@ -10,16 +10,16 @@
 
 ## Установка
 
-Модуль `gitverse.ru/pkg-ru/imager-client/v2` (go 1.23.7+, package `imager`, без внешних зависимостей):
+Модуль `github.com/pkg-ru/imager-client/v2` (go 1.23.7+, package `imager`, без внешних зависимостей):
 
 ```bash
-go get gitverse.ru/pkg-ru/imager-client/v2
+go get github.com/pkg-ru/imager-client/v2
 ```
 
 Импорт:
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2"
+import imager "github.com/pkg-ru/imager-client/v2"
 ```
 
 ## Инициализация
@@ -266,7 +266,7 @@ type AssetType struct {
 
 ### Реэкспорт через main.go
 
-Реализация находится в [`src/imager-go/`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-go) (`Imager.go`, `ImagerTypes.go`, package `imager`). Корневой файл [`main.go`](https://gitverse.ru/pkg-ru/imager-client/blob/master/main.go) реэкспортирует публичную часть через type aliases:
+Реализация находится в [`src/imager-go/`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-go) (`Imager.go`, `ImagerTypes.go`, package `imager`). Корневой файл [`main.go`](https://github.com/pkg-ru/imager-client/blob/master/main.go) реэкспортирует публичную часть через type aliases:
 
 ```go
 type Size = inner.Size
@@ -316,7 +316,7 @@ i.GetAssets("/test.gif", []any{"200x200", "x400"}, []any{"webp", "gif"}, 2)  // 
 ## Примеры
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2"
+import imager "github.com/pkg-ru/imager-client/v2"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",

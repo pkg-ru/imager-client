@@ -294,7 +294,7 @@ Path object field rules:
 
 ### Global format functions
 
-The [`ImagerTypes.php`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-php/ImagerTypes.php) file (namespace `imagerClient\`, loaded via `autoload.files`) defines:
+The [`ImagerTypes.php`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-php/ImagerTypes.php) file (namespace `imagerClient\`, loaded via `autoload.files`) defines:
 
 - `IMAGE_FORMATS` — a constant array of supported image formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Anything not in the list (video, etc.) is treated as a non-image when `format="auto"/""`.
 - `normalize_format(string $format): string` — normalization: lower-case, `jpeg` → `jpg`.

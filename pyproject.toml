@@ -20,9 +20,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://gitverse.ru/pkg-ru/imager"
-Repository = "https://gitverse.ru/pkg-ru/imager-client"
-Mirror = "https://github.com/pkg-ru/imager-client"
+Homepage = "https://github.com/pkg-ru/imager"
+Repository = "https://github.com/pkg-ru/imager-client"
+Mirror = "https://gitverse.ru/pkg-ru/imager-client"
 
 [tool.setuptools]
 packages = ["imager"]

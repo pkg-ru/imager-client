@@ -4,7 +4,7 @@ Client library for the **Imager** microservice for four languages — Python, PH
 
 > Requires a configured and running [Imager microservice](https://gitverse.ru/pkg-ru/imager).
 
-> **Primary repository:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Mirror:** [GitHub](https://github.com/pkg-ru/imager-client)
+> **Primary repository:** [GitHub](https://github.com/pkg-ru/imager-client) · **Mirror:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client)
 
 > **Demo:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager) — example of the microservice and client part in action
 
@@ -16,7 +16,7 @@ Client library for the **Imager** microservice for four languages — Python, PH
 - [TypeScript (client + server)](./TS-EN.md) — package on [npm](https://www.npmjs.com/package/imager-client)
   - [Vue](../packages/vue/README.md) — package on [npm](https://www.npmjs.com/package/@pkg-ru/imager-vue)
   - [React](../packages/react/README.md) — package on [npm](https://www.npmjs.com/package/@pkg-ru/imager-react)
-- [Go](./GO-EN.md) — module on [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2)
+- [Go](./GO-EN.md) — module on [pkg.go.dev](https://pkg.go.dev/github.com/pkg-ru/imager-client/v2)
 
 ---
 
@@ -35,7 +35,7 @@ Client library for the **Imager** microservice for four languages — Python, PH
 | Python | `imager_client` (PyPI) | `pip install imager_client` |
 | PHP | `pkg-ru/imager-client` (Composer) | `composer require pkg-ru/imager-client` |
 | TypeScript | `imager-client` (npm) | `npm install imager-client` |
-| Go | `gitverse.ru/pkg-ru/imager-client/v2` | `go get gitverse.ru/pkg-ru/imager-client/v2` |
+| Go | `github.com/pkg-ru/imager-client/v2` | `go get github.com/pkg-ru/imager-client/v2` |
 
 ## Framework components
 
@@ -121,7 +121,7 @@ await server.AdminGenerate("/test.gif", true);
 ### Go
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2"
+import imager "github.com/pkg-ru/imager-client/v2"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",
@@ -272,7 +272,7 @@ Package versions are synchronized by the script [`scripts/sync_version.py`](../s
 ## Project ecosystem
 
 - [Imager Service](https://gitverse.ru/pkg-ru/imager) — image generation microservice
-- [Imager Client](https://gitverse.ru/pkg-ru/imager-client) — this repository (mirror: [GitHub](https://github.com/pkg-ru/imager-client))
+- [Imager Client](https://github.com/pkg-ru/imager-client) — this repository (mirror: [GitVerse](https://gitverse.ru/pkg-ru/imager-client))
 - [Demo](https://altuh.ru/demo/imager) — example of the microservice and client part in action
 
 ## License

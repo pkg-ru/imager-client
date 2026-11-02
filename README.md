@@ -6,7 +6,7 @@
 
 > Для работы нужен настроенный и запущенный [микросервис Imager](https://gitverse.ru/pkg-ru/imager).
 
-**Основной репозиторий:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Зеркало:** [GitHub](https://github.com/pkg-ru/imager-client) · **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager)
+**Основной репозиторий:** [GitHub](https://github.com/pkg-ru/imager-client) · **Зеркало:** [GitVerse](https://gitverse.ru/pkg-ru/imager-client) · **Демо:** [altuh.ru/demo/imager](https://altuh.ru/demo/imager)
 
 **Документация:** RU / [EN](./doc/README-EN.md)
 
@@ -49,7 +49,7 @@
 | Python | [`imager_client`](https://pypi.org/project/imager_client/) | Python 3 | `pip install imager_client` | [RU](./doc/PY-RU.md) / [EN](./doc/PY-EN.md) |
 | PHP | [`pkg-ru/imager-client`](https://packagist.org/packages/pkg-ru/imager-client) | PHP ≥ 8.1, ext-curl | `composer require pkg-ru/imager-client` | [RU](./doc/PHP-RU.md) / [EN](./doc/PHP-EN.md) |
 | TypeScript | [`imager-client`](https://www.npmjs.com/package/imager-client) | Node 18+ (для server), браузеры | `npm install imager-client` | [RU](./doc/TS-RU.md) / [EN](./doc/TS-EN.md) |
-| Go | [`gitverse.ru/pkg-ru/imager-client/v2`](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2) | Go ≥ 1.23.7 | `go get gitverse.ru/pkg-ru/imager-client/v2` | [RU](./doc/GO-RU.md) / [EN](./doc/GO-EN.md) |
+| Go | [`github.com/pkg-ru/imager-client/v2`](https://pkg.go.dev/github.com/pkg-ru/imager-client/v2) | Go ≥ 1.23.7 | `go get github.com/pkg-ru/imager-client/v2` | [RU](./doc/GO-RU.md) / [EN](./doc/GO-EN.md) |
 
 ## Framework integrations
 
@@ -71,7 +71,7 @@
 pip install imager_client          # Python
 composer require pkg-ru/imager-client   # PHP
 npm install imager-client          # TypeScript
-go get gitverse.ru/pkg-ru/imager-client/v2   # Go
+go get github.com/pkg-ru/imager-client/v2   # Go
 ```
 
 ## Quick Start
@@ -117,7 +117,7 @@ const url = imager.GetAssetPath("/test.gif", "200x200", "webp");
 ### Go
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2"
+import imager "github.com/pkg-ru/imager-client/v2"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",
@@ -191,7 +191,7 @@ await server.AdminGenerate("/test.gif", true);
 | [PyPI](https://pypi.org/project/imager_client/) | `imager_client` |
 | [Packagist](https://packagist.org/packages/pkg-ru/imager-client) | `pkg-ru/imager-client`, [`pkg-ru/imager-twig`](https://packagist.org/packages/pkg-ru/imager-twig) |
 | [npm](https://www.npmjs.com/package/imager-client) | `imager-client`, [`@pkg-ru/imager-react`](https://www.npmjs.com/package/@pkg-ru/imager-react), [`@pkg-ru/imager-vue`](https://www.npmjs.com/package/@pkg-ru/imager-vue) |
-| [pkg.go.dev](https://pkg.go.dev/gitverse.ru/pkg-ru/imager-client/v2) | `gitverse.ru/pkg-ru/imager-client/v2` |
+| [pkg.go.dev](https://pkg.go.dev/github.com/pkg-ru/imager-client/v2) | `github.com/pkg-ru/imager-client/v2` |
 
 ## Compatibility
 
@@ -250,7 +250,7 @@ make build-vue       # сборка vue-пакета (включая ядро)
 ## Project ecosystem
 
 - [Imager Service](https://gitverse.ru/pkg-ru/imager) — микросервис генерации изображений
-- [Imager Client](https://gitverse.ru/pkg-ru/imager-client) — этот репозиторий (зеркало: [GitHub](https://github.com/pkg-ru/imager-client))
+- [Imager Client](https://github.com/pkg-ru/imager-client) — этот репозиторий (зеркало: [GitVerse](https://gitverse.ru/pkg-ru/imager-client))
 - [Демо](https://altuh.ru/demo/imager) — пример работы микросервиса и клиентской части
 
 ## License

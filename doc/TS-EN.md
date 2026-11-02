@@ -326,13 +326,13 @@ Path object field rules:
 
 ### Exports
 
-The client entry point [`imager-client`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts/index.ts) exports:
+The client entry point [`imager-client`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-ts/index.ts) exports:
 
 - Classes/types: `Imager` (and default), `AssetPath`, `AssetType`, `ImagerOptions`, `Segment`, `mimeFor`
 - Component layer (`component.ts`): `normalizeProps`, `ImagerComponentProps`, `NormalizedCall`, `NormalizePropsOptions`
 - Render layer (`render.ts`): `IMG_ATTRS`, `HtmlGroup`, `buildSrcset`, `fmtDescriptor`, `groupAssets`, `pickImgGroup`, `splitAttrs`, `useWidthDescriptors`
 
-The server entry point [`imager-client/server`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-ts-server/index.ts) exports: `ImagerServer`, `Imager`, `AssetPath`, `AssetType`, `ImagerOptions`, `ImagerServerOptions`, `Segment`, `mimeFor`.
+The server entry point [`imager-client/server`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-ts-server/index.ts) exports: `ImagerServer`, `Imager`, `AssetPath`, `AssetType`, `ImagerOptions`, `ImagerServerOptions`, `Segment`, `mimeFor`.
 
 `normalizeFormat`, `resolveFormat`, `dedupeFormats`, `IMAGE_FORMATS` are **not exported** from the client entry point (internal functions of the `ImagerTypes.ts` module).
 

@@ -1,8 +1,8 @@
 # React integration for Imager Client
 
-React-компоненты [`@pkg-ru/imager-react`](https://www.npmjs.com/package/@pkg-ru/imager-react) для микросервиса [Imager Service](https://gitverse.ru/pkg-ru/imager): рендер `<picture>`/`<img>` с адаптивными `srcset` на основе ядра [Imager Client](https://gitverse.ru/pkg-ru/imager-client).
+React-компоненты [`@pkg-ru/imager-react`](https://www.npmjs.com/package/@pkg-ru/imager-react) для микросервиса [Imager Service](https://gitverse.ru/pkg-ru/imager): рендер `<picture>`/`<img>` с адаптивными `srcset` на основе ядра [Imager Client](https://github.com/pkg-ru/imager-client).
 
-> [npm](https://www.npmjs.com/package/@pkg-ru/imager-react) · [Imager Service](https://gitverse.ru/pkg-ru/imager) · [Imager Client](https://gitverse.ru/pkg-ru/imager-client) · [Demo](https://altuh.ru/demo/imager)
+> [npm](https://www.npmjs.com/package/@pkg-ru/imager-react) · [Imager Service](https://gitverse.ru/pkg-ru/imager) · [Imager Client](https://github.com/pkg-ru/imager-client) · [Demo](https://altuh.ru/demo/imager)
 
 ## Overview
 
@@ -215,7 +215,7 @@ npm test   # из packages/react
 ## Related
 
 - [Imager Service](https://gitverse.ru/pkg-ru/imager) — микросервис обработки изображений
-- [Imager Client](https://gitverse.ru/pkg-ru/imager-client) — ядро (клиенты для TS/PHP/Python/Go)
+- [Imager Client](https://github.com/pkg-ru/imager-client) — ядро (клиенты для TS/PHP/Python/Go)
 - [Demo](https://altuh.ru/demo/imager) — демонстрация возможностей
 
 ## License

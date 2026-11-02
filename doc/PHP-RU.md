@@ -294,7 +294,7 @@ final class AssetType {
 
 ### Глобальные функции форматов
 
-Файл [`ImagerTypes.php`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-php/ImagerTypes.php) (namespace `imagerClient\`, подключается через `autoload.files`) определяет:
+Файл [`ImagerTypes.php`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-php/ImagerTypes.php) (namespace `imagerClient\`, подключается через `autoload.files`) определяет:
 
 - `IMAGE_FORMATS` — константа-массив поддерживаемых форматов картинок: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Всё, что не входит в список (видео и прочее), при `format="auto"/""` трактуется как не-картинка.
 - `normalize_format(string $format): string` — нормализация: lower-case, `jpeg` → `jpg`.

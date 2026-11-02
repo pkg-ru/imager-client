@@ -1,8 +1,8 @@
 # Twig integration for Imager Client
 
-Twig-расширение [`pkg-ru/imager-twig`](https://packagist.org/packages/pkg-ru/imager-twig) для микросервиса [Imager Service](https://gitverse.ru/pkg-ru/imager): функции `imager_assets` / `imager_asset` / `imager_assets_raw` для рендера `<picture>`/`<img>` с адаптивными `srcset` на основе ядра [Imager Client](https://gitverse.ru/pkg-ru/imager-client).
+Twig-расширение [`pkg-ru/imager-twig`](https://packagist.org/packages/pkg-ru/imager-twig) для микросервиса [Imager Service](https://gitverse.ru/pkg-ru/imager): функции `imager_assets` / `imager_asset` / `imager_assets_raw` для рендера `<picture>`/`<img>` с адаптивными `srcset` на основе ядра [Imager Client](https://github.com/pkg-ru/imager-client).
 
-> [Packagist](https://packagist.org/packages/pkg-ru/imager-twig) · [Репозиторий](https://github.com/pkg-ru/imager-twig) · [Imager Service](https://gitverse.ru/pkg-ru/imager) · [Imager Client](https://gitverse.ru/pkg-ru/imager-client) · [Demo](https://altuh.ru/demo/imager)
+> [Packagist](https://packagist.org/packages/pkg-ru/imager-twig) · [Репозиторий](https://github.com/pkg-ru/imager-twig) · [Imager Service](https://gitverse.ru/pkg-ru/imager) · [Imager Client](https://github.com/pkg-ru/imager-client) · [Demo](https://altuh.ru/demo/imager)
 
 ## Overview
 
@@ -139,7 +139,7 @@ php test/test.php   # из packages/twig
 ## Related
 
 - [Imager Service](https://gitverse.ru/pkg-ru/imager) — микросервис обработки изображений
-- [Imager Client](https://gitverse.ru/pkg-ru/imager-client) — ядро (клиенты для TS/PHP/Python/Go)
+- [Imager Client](https://github.com/pkg-ru/imager-client) — ядро (клиенты для TS/PHP/Python/Go)
 - [Demo](https://altuh.ru/demo/imager) — демонстрация возможностей
 
 ## License

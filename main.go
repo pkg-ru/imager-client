@@ -6,11 +6,11 @@
 //
 // Установка:
 //
-//	go get gitverse.ru/pkg-ru/imager-client/v2
+//	go get github.com/pkg-ru/imager-client/v2
 //
 // Импорт:
 //
-//	import imager "gitverse.ru/pkg-ru/imager-client/v2"
+//	import imager "github.com/pkg-ru/imager-client/v2"
 //
 // Краткий пример:
 //
@@ -29,7 +29,7 @@
 
 package imager
 
-import inner "gitverse.ru/pkg-ru/imager-client/v2/src/imager-go"
+import inner "github.com/pkg-ru/imager-client/v2/src/imager-go"
 
 // Size — сегмент-объект с необязательными размерами (реэкспорт из src/imager-go).
 type Size = inner.Size

@@ -1,109 +1,216 @@
-name: Publish (npm + PyPI)
+name: Publish
 
-# Публикация запускается только по repository_dispatch из GitVerse
-# (основной репозиторий) после успешных тестов и синхронизации манифестов。
-# npm и PyPI поддерживают OIDC-публикацию только через GitHub Actions,
-# поэтому обе публикации живут здесь, без долгоживущих токенов。
-
-# Версия в манифестах уже проставлена в .gitverse (sync_version.py коммитит
-# манифесты в тег перед отправкой dispatch), поэтому здесь sync_version не нужен。
-
-# Все публикации выполняются в одном контейнере (одна джоба publish)。
-
-# Ветки и теги в этот репозиторий-зеркало синхронизирует mirror.yml из GitVerse
-# (см. .gitverse/workflows/mirror.yml)。Прямой push тега сюда НЕ запускает
-# публикацию — только repository_dispatch, чтобы исключить двойную публикацию。
+# Основной пайплайн релиза (GitHub — основной репозиторий):
+# Все действия выполняются в одном контейнере (одна джоба build-test):
+#  1. сборка и единый golden-тест всех реализаций (TS, PHP, Python, Go)
+#     через оркестратор go run test/test.go;
+#  2. sync_version.py вызывается ровно один раз за пайплайн —
+#     только после успешного прохождения всех тестов;
+#  3. синхронизированные манифесты коммитятся в тег (force-push),
+#     чтобы версия фиксировалась в теге;
+#  4. тот же коммит с версией пушится в master (без force-push),
+#     чтобы ветка не расходилась с тегом; если master ушёл вперёд
+#     (тег создан не из master), push пропускается с предупреждением;
+#  5. Twig-пакет (packages/twig) публикуется в отдельный GitHub-репозиторий
+#     pkg-ru/imager-twig: содержимое коммитится поверх существующего master
+#     (fast-forward, история сохраняется) и в тег v<версия> (force-push),
+#     чтобы composer мог установить пакет по тегу
+#     (composer require pkg-ru/imager-twig:^2.0.1);
+#  6. тег с манифестами force-pushится в GitVerse-зеркало сразу здесь
+#     (без гонки с mirror.yml), чтобы GitVerse-зеркало имело тег
+#     с уже проставленной версией;
+#  7. после успешных тестов отправляем repository_dispatch в GitHub-основной
+#     репозиторий (pkg-ru/imager-client), где npm и PyPI публикуются по OIDC
+#     (эти реестры интегрируются с GitHub Actions, но не с GitVerse)。
+# Ветки и теги в GitVerse также синхронизирует mirror.yml
+# (см. .github/workflows/mirror.yml).
 
 on:
-  repository_dispatch:
-    types: [publish]
-
-permissions:
-  contents: read
+  push:
+    tags:
+      - 'v*'
 
 jobs:
-  publish:
-    name: Publish (npm + PyPI)
+  build-test:
+    name: Build, Test & Dispatch
+    # ВАЖНО: без условия github.event.created — в GitHub это поле
+    # не работает как ожидается для annotated tag created,
+    # поэтому проверяем иначе. Повторный запуск после force-push тега
+    # безопасен: sync_version.py не найдёт изменений (synced=false),
+    # а повторный dispatch приведёт к ошибке "version already exists"
+    # в npm/PyPI, что не ломает ничего.
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write   # OIDC для npm provenance, PyPI Trusted Publisher и npm OIDC publishing
-      contents: read
+
+    # Единый предварительно собранный CI-образ: PHP 8.1 + Composer,
+    # Node 22 + npm, Python 3.12, Go 1.23.7. Toolchain НЕ устанавливается
+    # в каждом запуске (см. .gitverse/docker/imager-ci/).
+    # Тег фиксированный (immutable), не latest. Обновление образа —
+    # отдельное контролируемое изменение (см. README в каталоге образа).
+    container:
+      image: gitverse.ru/pkg-ru/imager-ci:2026.09.2
+
     steps:
-      # Имя тега приходит в payload repository_dispatch из GitVerse。
-      - name: Resolve tag name
-        id: tag
-        env:
-          PAYLOAD_TAG: ${{ github.event.client_payload.tag }}
-        run: |
-          TAG="$PAYLOAD_TAG"
-          case "$TAG" in
-            v*) ;;
-            *) echo "Некорректный тег: $TAG" >&2; exit 1 ;;
-          esac
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Публикация по тегу: $TAG"
-
-      - name: Checkout tag
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.tag.outputs.tag }}
 
-      # registry-url НЕ указываем: он создаёт .npmrc с _authToken=${NODE_AUTH_TOKEN},
-      # а пустой токен перебивает OIDC-аутентификацию npm publish.
-      # npm OIDC publishing сам получает токен из окружения GitHub Actions.
-      - name: Setup Node.js 24 (npm provenance requires Node >= 24)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+      # Дешёвая ранняя проверка окружения: быстро показывает проблемы
+      # с CI-образом (неверная версия/отсутствующий toolchain).
+      - name: Check CI environment
+        run: |
+          set -e
+          php --version
+          composer --version
+          node --version
+          npm --version
+          python3 --version
+          go version
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: npm ci
 
-      - name: Build core (imager-client)
+      # Пакеты react/vue участвуют в golden-тестах (HTML-кейсы fixture.json)
+      # и имеют собственные зависимости — устанавливаем их до прогона.
+      - name: Install package dependencies (react/vue)
+        run: |
+          cd packages/react && npm ci
+          cd ../vue && npm ci
+
+      - name: Build TypeScript
         run: npm run build
 
-      - name: Publish core to npm (OIDC publishing + provenance, no token)
-        run: npm publish --provenance --access public
+      # Единый golden-тест для всех языков: orquestратор go run test/test.go
+      # запускает TS (npm test), PHP (php test/test.php), Python (python test/test.py),
+      # Go-часть (RunGolden/RunAdmin) и пакеты react/vue (npm test) последовательно。
+      - name: Test all languages (go run test/test.go)
+        run: go run test/test.go
 
-      - name: Publish @pkg-ru/imager-react to npm
+      - name: Install PHP dependencies (twig for extension test)
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Test Twig package
+        run: php packages/twig/test/test.php
+
+      # sync_version.py — ровно один раз за пайплайн и только после того,
+      # как все тесты прошли успешно (шаг выше упал бы при любой ошибке)。
+      - name: Sync version from tag
+        run: python scripts/sync_version.py "${{ github.ref_name }}"
+
+      # Коммитим синхронизированные манифесты в тег и force-push его,
+      # чтобы версия фиксировалась в теге.
+      - name: Commit synced manifests and update tag
+        id: sync-commit
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          TAG: ${{ github.ref_name }}
         run: |
-          cd packages/react
-          npm ci
-          npm run build
-          npm publish --provenance --access public
+          git config user.name "pkg-ru-bot"
+          git config user.email "pkg-ru-bot@gitverse.ru"
+          git add package.json package-lock.json pyproject.toml packages/react/package.json packages/react/package-lock.json packages/vue/package.json packages/vue/package-lock.json packages/twig/composer.json
+          if git diff --cached --quiet; then
+            echo "Манифесты уже синхронизированы, коммит не нужен"
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: sync version to ${TAG#v}"
+            git push --force "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
+            echo "synced=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Publish @pkg-ru/imager-vue to npm
+      # Пушим синхронизированные манифесты ещё и в master, чтобы ветка
+      # не расходилась с тегом. Без --force: если master ушёл вперёд
+      # (тег создан не из master), push упадёт — пропускаем с предупреждением,
+      # версия остаётся только в теге, публикация продолжается。
+      - name: Push version to master
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          TAG: ${{ github.ref_name }}
         run: |
-          cd packages/vue
-          npm ci
-          npm run build
-          npm publish --provenance --access public
+          if git push "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/heads/master" 2>/tmp/push-master.err; then
+            echo "Версия ${TAG#v} запушена в master"
+          else
+            echo "ВНИМАНИЕ: push в master не удался (вероятно, master ушёл вперёд)." >&2
+            cat /tmp/push-master.err >&2
+            echo "Версия ${TAG#v} осталась только в теге ${TAG}"
+          fi
 
-      - name: Install build tools (PyPI)
-        run: python -m pip install --upgrade build twine
-
-      # README для PyPI (doc/PY-RU.md) должен попасть в wheel:
-      # копируем его внутрь пакета imager как README.md
-      # (подключено как package-data в pyproject.toml)
-      - name: Copy README into package
+      # Публикуем Twig-пакет в отдельный GitHub-репозиторий pkg-ru/imager-twig
+      # (composer-пакет). Содержимое packages/twig (composer.json, README.md,
+      # src/, test/) коммитится поверх существующего master репозитория пакета
+      # (fast-forward, история сохраняется) и пушится:
+      #   - в master (без force) — чтобы ветка не расходилась с тегом;
+      #   - в тег v<версия> (force-push) — чтобы composer мог установить
+      #     пакет по тегу (composer require pkg-ru/imager-twig:^2.0.1).
+      # ВАЖНО: клонируем существующий репозиторий вместо git init — иначе
+      # новый root-коммит не является потомком master, push в мастер падает
+      # с non-fast-forward, и в репозитории остаётся старая версия (баг 2.0.6).
+      # Версия в composer.json уже проставлена sync_version.py выше.
+      - name: Publish Twig package to pkg-ru/imager-twig
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
         run: |
-          cp doc/PY-RU.md src/imager/README.md
+          set -e
+          # Путь к рабочей копии релиза (до cd в клон пакета)
+          WORKSPACE="${GITHUB_WORKSPACE:-$PWD}"
+          # Клонируем репозиторий пакета (все ветки), чтобы коммитить поверх master.
+          # rm -rf перед clone — идемпотентность при повторном запуске job.
+          rm -rf /tmp/imager-twig
+          git clone --no-single-branch "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-twig.git" /tmp/imager-twig
+          cd /tmp/imager-twig
+          git config user.name "pkg-ru-bot"
+          git config user.email "pkg-ru-bot@users.noreply.github.com"
+          # Заменяем содержимое packages/twig актуальной версией из релиза
+          rm -rf composer.json README.md src test
+          cp -r "${WORKSPACE}/packages/twig/composer.json" composer.json
+          cp -r "${WORKSPACE}/packages/twig/README.md" README.md
+          cp -r "${WORKSPACE}/packages/twig/src" src
+          cp -r "${WORKSPACE}/packages/twig/test" test
+          git add -A
+          # Если изменений нет (повторный запуск) — коммит не создаём
+          if git diff --cached --quiet; then
+            echo "Twig-пакет ${TAG} уже актуален, коммит не нужен"
+          else
+            git commit -q -m "chore: release ${TAG}"
+          fi
+          # master: без force, чтобы не затирать историю репозитория пакета.
+          # Коммит создан поверх существующего master, поэтому push fast-forward.
+          # При сбое job падает (set -e) — расхождение версий не останется незамеченным.
+          git push "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-twig.git" "HEAD:refs/heads/master"
+          echo "Twig-пакет ${TAG} запушен в master репозитория pkg-ru/imager-twig"
+          # тег: force-push, чтобы composer-версия всегда соответствовала релизу
+          git push --force "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-twig.git" "HEAD:refs/tags/${TAG}"
+          echo "Twig-пакет ${TAG} запушен в тег ${TAG} репозитория pkg-ru/imager-twig"
 
-      # Собираем в отдельную папку dist-python: dist/ уже занята npm-сборкой
-      # (dist/imager, dist/imager-server), и twine check падал бы на этих
-      # директориях с "Unknown distribution format".
-      - name: Build distribution
-        run: python -m build --outdir dist-python
+      # Force-push тега в GitVerse-зеркало сразу здесь, до отправки dispatch:
+      # гарантирует, что GitVerse-зеркало имеет тег с уже проставленной версией.
+      # Выполняется всегда — даже если манифесты уже были синхронизированы
+      # (synced=false), тег в GitVerse мог остаться старым.
+      - name: Push tag to GitVerse mirror
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          git push --force "https://x-access-token:${GITVERSE_PAT}@gitverse.ru/pkg-ru/imager-client.git" "HEAD:refs/tags/${TAG}"
+          echo "Тег ${TAG} с синхронизированными манифестами отправлен в GitVerse-зеркало"
 
-      - name: Check distribution
-        run: python -m twine check dist-python/*
-
-      - name: Publish to PyPI (OIDC Trusted Publisher, no token)
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist-python
+      # Отправляем repository_dispatch в GitHub-основной репозиторий при каждом
+      # первом запуске (created=true). Защита от дублирования — на уровне job:
+      # повторный запуск после force-push тега (created=false) пропускается.
+      # Dispatch отправляется всегда, даже если манифесты уже были
+      # синхронизированы (synced=false) — иначе публикация не запустится.
+      - name: Send repository_dispatch to GitHub
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          http_code=$(curl -sS -o /tmp/dispatch-response.json -w '%{http_code}' \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_PAT" \
+            https://api.github.com/repos/pkg-ru/imager-client/dispatches \
+            -d "{\"event_type\":\"publish\",\"client_payload\":{\"tag\":\"$TAG\"}}")
+          if [ "$http_code" != "204" ]; then
+            echo "GitHub API вернул $http_code:" >&2
+            cat /tmp/dispatch-response.json >&2
+            exit 1
+          fi
+          echo "repository_dispatch 'publish' (tag: $TAG) успешно отправлен в pkg-ru/imager-client"

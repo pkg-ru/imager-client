@@ -10,16 +10,16 @@
 
 ## Installation
 
-Module `gitverse.ru/pkg-ru/imager-client/v2` (go 1.23.7+, package `imager`, no external dependencies):
+Module `github.com/pkg-ru/imager-client/v2` (go 1.23.7+, package `imager`, no external dependencies):
 
 ```bash
-go get gitverse.ru/pkg-ru/imager-client/v2
+go get github.com/pkg-ru/imager-client/v2
 ```
 
 Import:
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2"
+import imager "github.com/pkg-ru/imager-client/v2"
 ```
 
 ## Initialization
@@ -266,7 +266,7 @@ Path object field rules:
 
 ### Re-export via main.go
 
-The implementation lives in [`src/imager-go/`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager-go) (`Imager.go`, `ImagerTypes.go`, package `imager`). The root file [`main.go`](https://gitverse.ru/pkg-ru/imager-client/blob/master/main.go) re-exports the public part via type aliases:
+The implementation lives in [`src/imager-go/`](https://github.com/pkg-ru/imager-client/blob/master/src/imager-go) (`Imager.go`, `ImagerTypes.go`, package `imager`). The root file [`main.go`](https://github.com/pkg-ru/imager-client/blob/master/main.go) re-exports the public part via type aliases:
 
 ```go
 type Size = inner.Size
@@ -316,7 +316,7 @@ i.GetAssets("/test.gif", []any{"200x200", "x400"}, []any{"webp", "gif"}, 2)  // 
 ## Examples
 
 ```go
-import imager "gitverse.ru/pkg-ru/imager-client/v2"
+import imager "github.com/pkg-ru/imager-client/v2"
 
 i := imager.New(imager.Options{
     BaseURL: "https://imgs.example.com/images/",

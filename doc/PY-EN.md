@@ -19,7 +19,7 @@ pip install imager_client
 Or from the repository:
 
 ```bash
-pip install git+https://gitverse.ru/pkg-ru/imager-client
+pip install git+https://github.com/pkg-ru/imager-client
 ```
 
 ## Import
@@ -39,7 +39,7 @@ The `Imager` class uses `__slots__` (a fixed set of fields, no `__dict__`).
 
 ### ImagerOptions vs ImagerServerOptions
 
-- [`ImagerOptions`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) — TypedDict of the client part: `dpr`, `format`, `formats`, `baseURL`, `sort`. **Does not contain** `token`/`adminURL`.
+- [`ImagerOptions`](https://github.com/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) — TypedDict of the client part: `dpr`, `format`, `formats`, `baseURL`, `sort`. **Does not contain** `token`/`adminURL`.
 - `ImagerServerOptions(ImagerOptions)` — extends it with `token`, `adminURL` (for admin methods).
 
 The `Imager` constructor accepts any dict and reads all seven keys from it (including `token`/`adminURL`), so for admin methods you can pass either `ImagerServerOptions` or a plain dict. The `ImagerOptions` typing simply does not describe the server keys.
@@ -164,7 +164,7 @@ Rules:
 - `width`/`height` on `<img>` are added from the base (first) path when known — for CLS. If the user provided their own `width`/`height` (directly or via `imgAttrs`) — automatic ones are not added (no duplication).
 - `imgAttrs` is merged with forwarded img attributes (`alt`, `sizes`, `loading`, `width`, `height`, `decoding`, `fetchpriority`): values from `imgAttrs` take priority. The `imgAttrs` key itself never lands on `<picture>`.
 - If there are no assets — an empty string is returned.
-- The Python implementation raises `IndexError` on an empty `GetAssets` result (access to `paths[0]`) — a known quirk, see the [README](https://gitverse.ru/pkg-ru/imager-client/blob/master/README.md).
+- The Python implementation raises `IndexError` on an empty `GetAssets` result (access to `paths[0]`) — a known quirk, see the [README](https://github.com/pkg-ru/imager-client/blob/master/README.md).
 
 Example:
 
@@ -313,7 +313,7 @@ Path object field rules:
 
 ### Format functions
 
-The [`imager.ImagerTypes`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) module exports:
+The [`imager.ImagerTypes`](https://github.com/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) module exports:
 
 - `IMAGE_FORMATS` — frozenset of supported image formats: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Anything not in the list (video, etc.) is treated as a non-image when `format="auto"/""`.
 - `normalize_format(format)` — normalization: lower-case, `jpeg` → `jpg`.

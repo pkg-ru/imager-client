@@ -2,7 +2,7 @@
     "name": "imager-client",
     "version": "2.0.6",
     "description": "Клиент микросервиса Imager: построение путей/URL ассетов (TypeScript)",
-    "homepage": "https://gitverse.ru/pkg-ru/imager",
+    "homepage": "https://github.com/pkg-ru/imager",
     "author": {
         "name": "Vladislav Altukhov",
         "url": "https://altuh.ru/about"
@@ -13,8 +13,8 @@
     },
     "readme": "doc/TS-RU.md",
     "support": {
-        "source": "https://gitverse.ru/pkg-ru/imager-client",
-        "docs": "https://gitverse.ru/pkg-ru/imager-client/README.md"
+        "source": "https://github.com/pkg-ru/imager-client",
+        "docs": "https://github.com/pkg-ru/imager-client/README.md"
     },
     "mirror": {
         "type": "git",

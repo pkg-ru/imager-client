@@ -1,6 +1,6 @@
 /*! @license
  * @pkg-ru/imager-vue — Vue 3-компоненты для микросервиса Imager
- * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Репозиторий: https://github.com/pkg-ru/imager-client (зеркало: https://gitverse.ru/pkg-ru/imager-client)
  * Автор: Vladislav Altukhov (https://altuh.ru/about)
  * Демо: https://altuh.ru/demo/imager
  */

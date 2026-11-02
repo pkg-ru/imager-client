@@ -1,14 +1,14 @@
 {
 	"name": "pkg-ru/imager-client",
 	"description": "Клиент микросервиса Imager: построение путей ассетов и админ-методы",
-	"homepage": "https://gitverse.ru/pkg-ru/imager",
+	"homepage": "https://github.com/pkg-ru/imager",
 	"support": {
-		"source": "https://gitverse.ru/pkg-ru/imager-client",
-		"docs": "https://gitverse.ru/pkg-ru/imager-client/README.md"
+		"source": "https://github.com/pkg-ru/imager-client",
+		"docs": "https://github.com/pkg-ru/imager-client/README.md"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://gitverse.ru/pkg-ru/imager-client.git"
+		"url": "https://github.com/pkg-ru/imager-client.git"
 	},
 	"type": "library",
 	"license": "GPL-3.0",

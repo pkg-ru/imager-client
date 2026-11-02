@@ -19,7 +19,7 @@ pip install imager_client
 Или из репозитория:
 
 ```bash
-pip install git+https://gitverse.ru/pkg-ru/imager-client
+pip install git+https://github.com/pkg-ru/imager-client
 ```
 
 ## Импорт
@@ -39,7 +39,7 @@ imager = Imager(options: ImagerOptions | dict | None = None)
 
 ### ImagerOptions vs ImagerServerOptions
 
-- [`ImagerOptions`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) — TypedDict клиентской части: `dpr`, `format`, `formats`, `baseURL`, `sort`. **Не содержит** `token`/`adminURL`.
+- [`ImagerOptions`](https://github.com/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) — TypedDict клиентской части: `dpr`, `format`, `formats`, `baseURL`, `sort`. **Не содержит** `token`/`adminURL`.
 - `ImagerServerOptions(ImagerOptions)` — расширяет его полями `token`, `adminURL` (для админ-методов).
 
 Конструктор `Imager` принимает любой dict и читает из него все семь ключей (включая `token`/`adminURL`), поэтому для админ-методов можно передавать как `ImagerServerOptions`, так и обычный dict. Типизация `ImagerOptions` просто не описывает серверные ключи.
@@ -164,7 +164,7 @@ def GetAssetsHtml(
 - `width`/`height` на `<img>` добавляются из базового (первого) path, если известны — для CLS. Если пользователь задал свои `width`/`height` (напрямую или через `imgAttrs`) — автоматические не добавляются (без дублирования).
 - `imgAttrs` объединяется с перенаправленными img-атрибутами (`alt`, `sizes`, `loading`, `width`, `height`, `decoding`, `fetchpriority`): значения из `imgAttrs` имеют приоритет. Сам ключ `imgAttrs` в `<picture>` не попадает.
 - Если ассетов нет — возвращается пустая строка.
-- Python-реализация при пустом результате `GetAssets` бросает `IndexError` (обращение к `paths[0]`) — известная особенность, см. [README](https://gitverse.ru/pkg-ru/imager-client/blob/master/README.md).
+- Python-реализация при пустом результате `GetAssets` бросает `IndexError` (обращение к `paths[0]`) — известная особенность, см. [README](https://github.com/pkg-ru/imager-client/blob/master/README.md).
 
 Пример:
 
@@ -313,7 +313,7 @@ class AssetType(TypedDict):
 
 ### Функции форматов
 
-Модуль [`imager.ImagerTypes`](https://gitverse.ru/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) экспортирует:
+Модуль [`imager.ImagerTypes`](https://github.com/pkg-ru/imager-client/blob/master/src/imager/ImagerTypes.py) экспортирует:
 
 - `IMAGE_FORMATS` — frozenset поддерживаемых форматов картинок: `jpg, jpeg, png, webp, avif, heif, heic, apng, jxl, gif`. Всё, что не входит в список (видео и прочее), при `format="auto"/""` трактуется как не-картинка.
 - `normalize_format(format)` — нормализация: lower-case, `jpeg` → `jpg`.
@@ -390,6 +390,6 @@ ok = admin.AdminDelete(asset, wait=False)          # DELETE .../admin/assets/del
 python test/test.py
 ```
 
-Раннер читает [`test/fixture.json`](https://gitverse.ru/pkg-ru/imager-client/blob/master/test/fixture.json) и выполняет golden-кейсы. Полный прогон всех языков — `make test` (оркестратор — `go run test/test.go`).
+Раннер читает [`test/fixture.json`](https://github.com/pkg-ru/imager-client/blob/master/test/fixture.json) и выполняет golden-кейсы. Полный прогон всех языков — `make test` (оркестратор — `go run test/test.go`).
 
 © 2025 [Алтухов Владислав Владимирович](https://altuh.ru/about)

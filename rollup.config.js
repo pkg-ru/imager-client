@@ -5,7 +5,7 @@ import typescript from 'rollup-plugin-typescript2';
 // поэтому сборщики мусора (terser/uglify/esbuild) его не удаляют.
 const banner = `/*! @license
  * imager-client — клиент микросервиса Imager
- * Репозиторий: https://gitverse.ru/pkg-ru/imager-client (зеркало: https://github.com/pkg-ru/imager-client)
+ * Репозиторий: https://github.com/pkg-ru/imager-client (зеркало: https://gitverse.ru/pkg-ru/imager-client)
  * Автор: Vladislav Altukhov (https://altuh.ru/about)
  * Демо: https://altuh.ru/demo/imager
  */`;

@@ -1,4 +1,4 @@
-// Benchmark for gitverse.ru/pkg-ru/imager-client/v2 (Go implementation).
+// Benchmark for github.com/pkg-ru/imager-client/v2 (Go implementation).
 //
 // Запуск из корня проекта:
 //
@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"time"
 
-	imager "gitverse.ru/pkg-ru/imager-client/v2"
+	imager "github.com/pkg-ru/imager-client/v2"
 )
 
 func bench(name string, fn func(), iterations int) {
