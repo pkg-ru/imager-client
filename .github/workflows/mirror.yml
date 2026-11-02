@@ -1,0 +1,78 @@
+name: Mirror to GitVerse
+
+# Зеркалирование GitHub (источник изменений) в GitVerse.
+# Все ветки и теги, запушенные в github.com/pkg-ru/imager-client,
+# отправляются в gitverse.ru/pkg-ru/imager-client одной джобой.
+#
+# Зачем: авторизация для автопубликации пакетов есть только на GitVerse,
+# поэтому релизный пайплайн (.gitverse/workflows/publish.yml) живёт там.
+# Зеркало приносит в GitVerse коммиты и теги, тег v* запускает публикацию
+# пакетов (npm, PyPI, Twig) уже на стороне GitVerse.
+#
+# Направление строго одно: GitHub -> GitVerse. Обратного зеркалирования нет
+# (иначе ветки и теги перезаписывали бы друг друга встречными force-push'ами),
+# поэтому publish.yml ничего не пушит в этот репозиторий.
+#
+# Секрет: GITVERSE_PAT (или VERSE_TOKEN) — токен с правом push
+# в gitverse.ru/pkg-ru/imager-client. Задаётся в настройках GitHub-репозитория:
+# Settings -> Secrets and variables -> Actions.
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  # Ручной запуск, чтобы догнать зеркало без нового коммита.
+  workflow_dispatch:
+
+# Два пуша подряд не должны гоняться за один и тот же ref.
+concurrency:
+  group: mirror-to-gitverse
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Push refs to GitVerse
+    runs-on: ubuntu-latest
+    steps:
+      # Зеркальный клон (все ветки + все теги одним действием) вместо
+      # actions/checkout: не зависим от поведения checkout-действия
+      # и получаем ровно те refs, которые нужно отправить.
+      # Токен GitHub Actions работает только для этого репозитория —
+      # этого достаточно, клон только читает исходный репозиторий.
+      - name: Clone GitHub repository (mirror)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          rm -rf /tmp/mirror
+          git clone --mirror \
+            "https://x-access-token:${GH_TOKEN}@github.com/pkg-ru/imager-client.git" \
+            /tmp/mirror
+
+      # Синхронизируем только ветки и теги:
+      #   +refs/heads/* — force-push всех веток;
+      #   +refs/tags/*  — force-push всех тегов;
+      #   --prune       — удаляем в GitVerse ветки/теги, которых больше нет
+      #                   в GitHub (зеркало должно совпадать с источником).
+      # Force-push тега в GitVerse повторно запускает publish.yml на тот же
+      # тег — это безопасно: sync_version.py идемпотентен, а уже занятые
+      # версии пакетов пропускаются (npm view / twine --skip-existing).
+      - name: Push branches and tags to GitVerse
+        env:
+          GITVERSE_PAT: ${{ secrets.GITVERSE_PAT }}
+          VERSE_TOKEN: ${{ secrets.VERSE_TOKEN }}
+        run: |
+          set -e
+          PAT="${GITVERSE_PAT:-$VERSE_TOKEN}"
+          if [ -z "$PAT" ]; then
+            echo "Не задан секрет GITVERSE_PAT (или VERSE_TOKEN)" >&2
+            exit 1
+          fi
+          cd /tmp/mirror
+          git push --prune --force \
+            "https://x-access-token:${PAT}@gitverse.ru/pkg-ru/imager-client.git" \
+            "+refs/heads/*:refs/heads/*" \
+            "+refs/tags/*:refs/tags/*"
+          echo "Все ветки и теги GitHub отправлены в GitVerse-зеркало"
