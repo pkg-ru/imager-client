@@ -64,9 +64,11 @@ jobs:
           git clone --no-single-branch \
             "https://x-access-token:${GH_PAT}@github.com/pkg-ru/imager-client.git" \
             /tmp/repo
-          # Добавляем .git в рабочую директорию, не трогая исходные файлы
-          rm -rf "${TARGET}/.git"
-          cp -r /tmp/repo/.git "${TARGET}/.git"
+          # Копируем ВСЕ исходные файлы и .git из клонированного репозитория
+          # в рабочую директорию (не трогая исходные файлы контейнера).
+          rm -rf "${TARGET:?}/.git"
+          cp -r /tmp/repo/.git "${TARGET:?}/.git"
+          cp -r /tmp/repo/* "${TARGET:?}/"
           # Git 2.35+ блокирует выполнение в directorии, принадлежащей
           # другому пользователю (dubious ownership). Регистрируем её как безопасную.
           git config --global --add safe.directory "${TARGET}"
